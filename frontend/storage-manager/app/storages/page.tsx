@@ -4,7 +4,14 @@ import { fileItemColumns, FileItem } from "@/components/storages/fileitem-column
 import { FileWorkspacePanel } from "@/components/file-workspace-panel"
 
 
-export const fileItems: FileItem[] = [
+
+interface QueryParameter {
+  resource_name?: string
+  path_id?: string
+}
+
+
+const fileItems: FileItem[] = [
   {
     id: "728ed52f",
     status: "completed",
@@ -19,9 +26,11 @@ export const fileItems: FileItem[] = [
   },
 ]
 
+
 export default function Page() {
+
   return (
-    <div className="container mx-auto py-10">
+    <div className="container mx-auto">
       <FileWorkspacePanel columns={fileItemColumns} data={fileItems} />
     </div>
   )

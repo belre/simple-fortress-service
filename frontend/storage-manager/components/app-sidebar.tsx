@@ -9,9 +9,6 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarMenuSub,
-  SidebarMenuSubButton,
-  SidebarMenuSubItem,
 } from "@/components/ui/sidebar"
 
 import { HugeiconsIcon } from '@hugeicons/react'
@@ -22,40 +19,64 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible"
-import { TooltipProvider } from "./ui/tooltip";
+import { StorageDirectoryIndexed } from "@/models/storage";
+import { awsStorageMockMetadata } from "@/mock/pathResolver.mock";
 
-const awsStorageMetadata = [{
-  url: "/storages?bucket=my-bucket",
-  name: "My Bucket",
-  icon: Plus,
-  directory: {
-    "root/" : {
-      icon: Folder,
-      url: "/storages?bucket=my-bucket&path_id=xxx1"
-    },
-    "path/to/directory/" : {
-      icon: Folder,
-      url: "/storages?bucket=my-bucket&path_id=xxx2"
-    }
+
+export const APP_ICONS = {
+  Plus, Star, Delete, Folder
+} as const
+
+
+export type IconObject = (typeof APP_ICONS)[keyof typeof APP_ICONS];
+const selectIcon = (resourceType?: string) => {
+  switch(resourceType) {
+    case "favorites":
+      return Star
+    case "trashes":
+      return Delete
+    case "s3-prefix":
+      return Folder
+    default:
+      return Plus
   }
-}, {
-  url: "/storages?bucket=guest-bucket",
-  name: "Guest Bucket",
-  icon: Plus,
-},   
-{ 
-  url: "/storages?view=favorites", 
-  name: "すべてのお気に入り", 
-  icon: Star 
-},
-{ 
-  url: "/storages?view=trash", 
-  name: "ゴミ箱", 
-  icon: Delete 
-}]
+}
+interface TmpStorageDirectoryIndexed extends StorageDirectoryIndexed {
+  icon: IconObject
+  directory: Array<TmpStorageDirectoryIndexed> | null
+}
 
-const storageAlignments ={
-  "AWS": awsStorageMetadata,
+
+const storageAlignments : Record<string, Array<TmpStorageDirectoryIndexed>> = {
+  "AWS": awsStorageMockMetadata.map(metadata => {
+    return {
+      ...metadata,
+      icon: selectIcon(metadata.resourceType),
+      directory: (metadata.directory ?? []).map(child => { 
+        return {
+          ...child,
+          icon: selectIcon(child.resourceType),
+          directory: null
+        }
+      })
+    }
+  }),
+}
+
+const generateStorageLink = (renderElement: React.ReactElement, storageWorkspace: StorageDirectoryIndexed, storageTarget: StorageDirectoryIndexed) : React.ReactElement => {
+  /* 👇 矢印側：shrink-0 をつけて、ボタンの幅に潰されないようにガードします */
+  return (
+    <div className="inline-flex items-center justify-center ">
+      {
+        storageWorkspace.routingTarget ? 
+        <a 
+          href={`${storageWorkspace.routingTarget}?resource_name=${storageWorkspace.resourceName}&path_id=${storageTarget.pathId}`} 
+          className="flex p-2 text-sidebar-foreground/50 hover:text-sidebar-foreground"
+        >
+          {renderElement}
+        </a> : <span className="p-2"/>
+      }
+    </div> )
 }
 
 export function AppSidebar() {
@@ -86,25 +107,28 @@ export function AppSidebar() {
                                 <span className="truncate">{project.name}</span>
                               </SidebarMenuButton>
                             </CollapsibleTrigger>
-
-                            {/* 👇 矢印側：shrink-0 をつけて、ボタンの幅に潰されないようにガードします */}
-                            <a 
-                              href={project.url} 
-                              className="p-2 text-sidebar-foreground/50 hover:text-sidebar-foreground flex items-center justify-center h-8 w-8 shrink-0"
-                            >
-                              <ChevronRight className="h-4 w-4" />
-                            </a>
+                            {
+                              generateStorageLink(
+                                (<ChevronRight className="h-4 w-4" />),
+                                project, project
+                              )
+                            }
                           </div>
                           <CollapsibleContent>
                           <SidebarGroupContent>
                             <SidebarMenu>
-                              {Object.entries(project.directory || {}).map(([dir, dirMetadata]) => (
-                                <SidebarMenuItem key={dir}>
+                              {(project.directory ?? []).map((child) => (
+                                <SidebarMenuItem key={child.name}>
                                   <SidebarMenuButton asChild>
                                     <div className="flex items-center gap-2">
                                       <span className="ml-4" />
-                                      <HugeiconsIcon icon={dirMetadata.icon} />
-                                      <a href={dirMetadata.url}>{dir}</a>
+                                      <HugeiconsIcon icon={child.icon} className="shrink-0" />
+                                      {
+                                        generateStorageLink(
+                                          (<span>{child.name}</span>),
+                                          project, child
+                                        )
+                                      }
                                     </div>
                                   </SidebarMenuButton>
                                 </SidebarMenuItem>

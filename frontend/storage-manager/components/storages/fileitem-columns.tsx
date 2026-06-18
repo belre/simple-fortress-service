@@ -15,6 +15,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 
+import { Input } from "@/components/ui/input"
+import * as React from "react"
 
 declare module "@tanstack/react-table" {
   interface ColumnMeta<TData, TValue> {
@@ -29,9 +31,8 @@ export type FileItem = {
 	fileName: string
   updatedAt: string,
   status: "syncing" | "completed"
+  isRenamingFileName?: boolean
 }
-
-
 
 
 export const fileItemColumns: ColumnDef<FileItem>[] = [
@@ -65,13 +66,32 @@ export const fileItemColumns: ColumnDef<FileItem>[] = [
       <span className="ml-3 mr-3">FileName</span>
     )
   },
-  cell: ({ row }) => {
+  cell: ({ row, table }) => {
     const fileItem = row.original
     
+    // 💡 王様が meta に仕込んでくれた状態と関数をここで召喚する！
+    const meta = table.options.meta as any
+    const isCurrentRowRenaming = meta?.isRenamingFile && meta?.focusedId === fileItem.id
+
     return (
-      <span className="ml-3 mr-3">{fileItem.fileName}</span>
+      isCurrentRowRenaming ? (
+        <Input 
+          id="renamingFileName" 
+          autoComplete="off" 
+          // 💡 解決策Aの「王様の最新データを直接見に行く」技をここでも使用
+          value={meta?.tableData?.find((item: any) => item.id === fileItem.id)?.fileName ?? ""}
+          onClick={(e) => e.stopPropagation()} 
+          onChange={(evt) => {
+            // 💡 王様に直接データを書き換えてもらう
+            meta.updateRowName(fileItem.id, evt.target.value)
+          }}  
+        />
+      ) : (
+        <span className="ml-3 mr-3">{fileItem.fileName}</span>
+      )
     )
   },
+  minSize: 100,
   meta: {
     isGrow: true
   }
@@ -96,7 +116,7 @@ export const fileItemColumns: ColumnDef<FileItem>[] = [
 },
 {
   id: "actions",
-  cell: ({ row }) => {
+  cell: ({ row, table }) => {
     const fileItem = row.original
  
     return (
@@ -115,12 +135,17 @@ export const fileItemColumns: ColumnDef<FileItem>[] = [
             Copy fileItem ID
           </DropdownMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuItem>View customer</DropdownMenuItem>
+          <DropdownMenuItem
+            onClick={() => {
+              const meta = table.options.meta as any
+              meta.setRenamingFile(true)
+            }}>Rename</DropdownMenuItem>
           <DropdownMenuItem>View fileItem details</DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
     )
   },
-},
-]
+}]
+
+
 
