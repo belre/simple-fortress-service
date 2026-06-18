@@ -4,13 +4,6 @@ import { fileItemColumns, FileItem } from "@/components/storages/fileitem-column
 import { FileWorkspacePanel } from "@/components/file-workspace-panel"
 
 
-
-interface QueryParameter {
-  resource_name?: string
-  path_id?: string
-}
-
-
 const fileItems: FileItem[] = [
   {
     id: "728ed52f",

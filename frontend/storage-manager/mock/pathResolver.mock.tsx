@@ -1,25 +1,25 @@
 import { StorageDirectoryIndexed } from "@/models/storage";
 
 export const awsStorageMockMetadata : Array<StorageDirectoryIndexed> = [{
-  name: "My Bucket",
+  name: "/",
   resourceType: "s3",
   resourceName: "my-bucket",
   routingTarget: "/storages",
   pathId: "bbb1",
   directory: [
   {
-    name: "root/",
+    name: "/root/",
     pathId: "xxx1",
     directory: null
   },
   {
-    name: "path/to/directory/",
+    name: "/path/to/directory/",
     pathId: "xxx2",
     directory: null
   }],
 }, {
-  name: "Guest Bucket",
-  resourceType: "bucket",
+  name: "/",
+  resourceType: "s3",
   resourceName: "guest-bucket",
   routingTarget: "/storages",
   pathId: "bbb2",

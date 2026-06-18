@@ -16,7 +16,6 @@ import {
 } from "@/components/ui/dropdown-menu"
 
 import { Input } from "@/components/ui/input"
-import * as React from "react"
 
 declare module "@tanstack/react-table" {
   interface ColumnMeta<TData, TValue> {
@@ -61,7 +60,7 @@ export const fileItemColumns: ColumnDef<FileItem>[] = [
 },
 {
   accessorKey: "fileName",
-  header: ({ column } ) =>{
+  header: () =>{
     return (
       <span className="ml-3 mr-3">FileName</span>
     )

@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/sidebar"
 
 import { HugeiconsIcon } from '@hugeicons/react'
-import { Plus, Star, Delete, Folder } from "@hugeicons/core-free-icons"
+import { Plus, Star, Delete, Folder, BucketIcon } from "@hugeicons/core-free-icons"
 import { ChevronRight, ChevronDown } from 'lucide-react';
 import {
   Collapsible,
@@ -35,8 +35,8 @@ const selectIcon = (resourceType?: string) => {
       return Star
     case "trashes":
       return Delete
-    case "s3-prefix":
-      return Folder
+    case "s3":
+      return BucketIcon
     default:
       return Plus
   }
@@ -55,7 +55,7 @@ const storageAlignments : Record<string, Array<TmpStorageDirectoryIndexed>> = {
       directory: (metadata.directory ?? []).map(child => { 
         return {
           ...child,
-          icon: selectIcon(child.resourceType),
+          icon: Folder,
           directory: null
         }
       })
@@ -104,7 +104,7 @@ export function AppSidebar() {
                               {/* 👇 ボタン側：min-w-0 と truncate（または w-full）で、右側の要素を押し出さないようにします */}
                               <SidebarMenuButton className="min-w-0 flex-1 justify-start">
                                 <HugeiconsIcon icon={project.icon} className="shrink-0" />
-                                <span className="truncate">{project.name}</span>
+                                <span className="truncate">{project.resourceName}</span>
                               </SidebarMenuButton>
                             </CollapsibleTrigger>
                             {

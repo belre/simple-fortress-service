@@ -16,7 +16,6 @@ interface QueryParameter {
   path_id?: string
 }
 
-
 interface FileWorkspacePanelProps<TData extends GeneralRow> {
   columns?: ColumnDef<TData, any>[];
   data: FileItem[];
@@ -54,7 +53,7 @@ function FileWorkspacePanelContent<TData extends GeneralRow>({ columns, data, qu
   React.useEffect(() => {
     const fetchResourceTarget = async() => {
       const fetched = await fetchFilePath(queryParameter?.path_id)
-      setTargetDir( `s3://${fetched?.resourceName}/${fetched?.name}`)      
+      setTargetDir( `s3://${fetched?.resourceName}${fetched?.name}`)      
     }
     fetchResourceTarget()
   }, [queryParameter?.path_id])
