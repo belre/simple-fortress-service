@@ -5,6 +5,8 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { MoreHorizontal } from "lucide-react"
 import { ArrowUpDown } from "lucide-react"
 
+import * as React from "react"
+
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -19,7 +21,7 @@ import { Input } from "@/components/ui/input"
 
 declare module "@tanstack/react-table" {
   interface ColumnMeta<TData, TValue> {
-    isGrow?: boolean
+    isGrow?: boolean,
   }
 }
 
@@ -30,8 +32,13 @@ export type FileItem = {
 	fileName: string
   updatedAt: string,
   status: "syncing" | "completed"
-  isRenamingFileName?: boolean
 }
+
+export interface RenamingStatus {
+  isRenaming: boolean
+  previousValue?: string
+}
+
 
 
 export const fileItemColumns: ColumnDef<FileItem>[] = [
@@ -67,23 +74,52 @@ export const fileItemColumns: ColumnDef<FileItem>[] = [
   },
   cell: ({ row, table }) => {
     const fileItem = row.original
-    
+
     // 💡 王様が meta に仕込んでくれた状態と関数をここで召喚する！
     const meta = table.options.meta as any
-    const isCurrentRowRenaming = meta?.isRenamingFile && meta?.focusedId === fileItem.id
-
+    const isCurrentRowRenaming = meta?.renamingStatus.isRenaming && meta?.focusedId === fileItem.id
     return (
       isCurrentRowRenaming ? (
         <Input 
           id="renamingFileName" 
           autoComplete="off" 
-          // 💡 解決策Aの「王様の最新データを直接見に行く」技をここでも使用
+          ref={(el) => {
+            // autoFocusの代替動作
+            if (el) {
+              setTimeout(() => el.focus(), 0);
+            }
+          }}
           value={meta?.tableData?.find((item: any) => item.id === fileItem.id)?.fileName ?? ""}
-          onClick={(e) => e.stopPropagation()} 
+          onClick={(evt) => evt.stopPropagation()} 
           onChange={(evt) => {
             // 💡 王様に直接データを書き換えてもらう
             meta.updateRowName(fileItem.id, evt.target.value)
-          }}  
+          }}
+          onBlur={(evt) => {
+            meta.setRenamingStatus({
+              isRenaming: false
+            });
+          }}
+          onKeyDown={(evt) => {
+            if (evt.key === "Enter") {
+              evt.preventDefault();
+              meta.setRenamingStatus({
+                isRenaming: false
+              });
+            }
+
+            if (evt.key === "Escape") {
+              evt.preventDefault();
+              // 2. Escが押されたら、編集モードを終了する（キャンセル）
+              // 本来は変更前の値に戻す処理を入れますが、まずはモード解除だけでOK
+              if(meta?.renamingStatus.previousValue) {
+                meta.updateRowName(fileItem.id, meta?.renamingStatus.previousValue)
+              }
+              meta.setRenamingStatus({
+                isRenaming: false
+              });
+            }
+          }}
         />
       ) : (
         <span className="ml-3 mr-3">{fileItem.fileName}</span>
@@ -135,9 +171,12 @@ export const fileItemColumns: ColumnDef<FileItem>[] = [
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem
-            onClick={() => {
+            onSelect={(evt) => {
               const meta = table.options.meta as any
-              meta.setRenamingFile(true)
+              meta.setRenamingStatus({
+                isRenaming: true,
+                previousValue: fileItem.fileName
+              })
             }}>Rename</DropdownMenuItem>
           <DropdownMenuItem>View fileItem details</DropdownMenuItem>
         </DropdownMenuContent>

@@ -9,7 +9,8 @@ import { PathResolverService } from "@/service/storage/pathResolver.service";
 
 import { useSearchParams } from "next/navigation";
 
-import { FileItem, fileItemColumns } from "@/components/storages/fileitem-columns"
+import { FileItem, fileItemColumns, RenamingStatus } from "@/components/storages/fileitem-columns"
+import { Skeleton } from "@/components/ui/skeleton"
 
 interface QueryParameter {
   resource_name?: string
@@ -41,8 +42,10 @@ function FileWorkspacePanelContent<TData extends GeneralRow>({ columns, data, qu
 
   // 💡 テーブルのフォーカスや遅延制御の状態は、このパネルが王様として管理する
   const [focusedId, setFocusedId] = React.useState<string | null>(null)
-  const isRenamingState = React.useState(false)
-  const [isRenamingFile, setRenamingFile] = isRenamingState
+  const renameStatusState = React.useState<RenamingStatus>({
+    isRenaming: false,
+  })
+  const [renamingStatus, setRenamingStatus] = renameStatusState
 
   // 💡 データを王様のStateとして管理する（これでReactが変更を検知できる）
   const [tableData, setTableData] = React.useState<FileItem[]>(data)
@@ -57,14 +60,44 @@ function FileWorkspacePanelContent<TData extends GeneralRow>({ columns, data, qu
     }
     fetchResourceTarget()
   }, [queryParameter?.path_id])
+
   return (
     // ただのdivではなく、役割を持った「ワークスペースの背景」として定義
     <div
-      onClick={() => {
-        setFocusedId(null)
-        setRenamingFile(false)
+      className="outline-none w-full min-h-screen"
+      tabIndex={0}
+      onDragOver={(evt) => {
+        console.log(evt)
+      }}
+      onKeyDown={(evt) => {
+        if (document.activeElement?.tagName === "INPUT") {
+          return;
+        }
+        if(evt.key == "F2") {
+          if(focusedId) {
+            const targets = tableData
+              .filter((item) => item.id === focusedId)
+
+            if(targets.length !== 1) {
+              console.warn("Target Renaming file not found")
+              return
+            }
+
+            const target = targets[0]
+            setRenamingStatus({
+              isRenaming: true,
+              previousValue: target.fileName
+            })
+          }
+        }
       }}>
-      <h2 className="ml-3">{targetDir}</h2>
+      <div className="h-[30px] flex items-center">
+        {
+          targetDir ? 
+            <h2 className="ml-3 items-center">{targetDir}</h2> :
+            <Skeleton className="ml-3 w-[200px] rounded-full h-4" />
+        }
+      </div>
       <Separator />
       <DataTableSheet 
         columns={fileItemColumns}
@@ -72,15 +105,16 @@ function FileWorkspacePanelContent<TData extends GeneralRow>({ columns, data, qu
         focusId={focusedId}
         onRowSelected={(newUuid) => {
           if(newUuid != focusedId){
-            // 値が異なる場合、renameを解除する
-            setRenamingFile(false)
+            setRenamingStatus({
+              isRenaming: false
+            })
           }
           setFocusedId(newUuid)
         }}
         meta={{
           focusedId,
-          isRenamingFile,
-          setRenamingFile,
+          renamingStatus,
+          setRenamingStatus,
           tableData,
           updateRowName: (rowId: string, newName: string) => {
             setTableData((prev) => tableData.map((item) => item.id === rowId ? { ...item, fileName: newName } : item))
