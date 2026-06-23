@@ -5,8 +5,6 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { MoreHorizontal } from "lucide-react"
 import { ArrowUpDown } from "lucide-react"
 
-import * as React from "react"
-
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -17,7 +15,39 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 
+import { Plus, Star, Delete, Folder, BucketIcon, File02Icon } from "@hugeicons/core-free-icons"
+
+export const APP_ICONS = {
+  Plus, Star, Delete, Folder, BucketIcon
+} as const
+
+export type StorageServiceIconObject = (typeof APP_ICONS)[keyof typeof APP_ICONS];
+
+export const describeLargeIcon = (resourceType: AllowedResourceType | string | undefined) => {
+  if(!resourceType) {
+    return null
+  }
+
+  switch(resourceType) {
+    case "aws-favorites":
+      return Star
+    case "aws-trashes":
+      return Delete
+    case "s3-prefix":
+      return BucketIcon
+    case "s3-folder":
+      return Folder
+    default:
+      return Plus
+  }
+}
+
+
 import { Input } from "@/components/ui/input"
+import { AllowedResourceType } from "@/models/storage"
+import { HugeiconsIcon } from "@hugeicons/react"
+import Link from "next/link"
+
 
 declare module "@tanstack/react-table" {
   interface ColumnMeta<TData, TValue> {
@@ -32,13 +62,14 @@ export type FileItem = {
 	fileName: string
   updatedAt: string,
   status: "syncing" | "completed"
+  icon?: StorageServiceIconObject
+  link?: string | null
 }
 
 export interface RenamingStatus {
   isRenaming: boolean
   previousValue?: string
 }
-
 
 
 export const fileItemColumns: ColumnDef<FileItem>[] = [
@@ -69,7 +100,7 @@ export const fileItemColumns: ColumnDef<FileItem>[] = [
   accessorKey: "fileName",
   header: () =>{
     return (
-      <span className="ml-3 mr-3">FileName</span>
+      <span className="ml-6 mr-3">FileName</span>
     )
   },
   cell: ({ row, table }) => {
@@ -78,52 +109,59 @@ export const fileItemColumns: ColumnDef<FileItem>[] = [
     // 💡 王様が meta に仕込んでくれた状態と関数をここで召喚する！
     const meta = table.options.meta as any
     const isCurrentRowRenaming = meta?.renamingStatus.isRenaming && meta?.focusedId === fileItem.id
-    return (
-      isCurrentRowRenaming ? (
-        <Input 
-          id="renamingFileName" 
-          autoComplete="off" 
-          ref={(el) => {
-            // autoFocusの代替動作
-            if (el) {
-              setTimeout(() => el.focus(), 0);
-            }
-          }}
-          value={meta?.tableData?.find((item: any) => item.id === fileItem.id)?.fileName ?? ""}
-          onClick={(evt) => evt.stopPropagation()} 
-          onChange={(evt) => {
-            // 💡 王様に直接データを書き換えてもらう
-            meta.updateRowName(fileItem.id, evt.target.value)
-          }}
-          onBlur={(evt) => {
-            meta.setRenamingStatus({
-              isRenaming: false
-            });
-          }}
-          onKeyDown={(evt) => {
-            if (evt.key === "Enter") {
-              evt.preventDefault();
-              meta.setRenamingStatus({
-                isRenaming: false
-              });
-            }
+    
+    const displayIcon = fileItem.icon ?? File02Icon
 
-            if (evt.key === "Escape") {
-              evt.preventDefault();
-              // 2. Escが押されたら、編集モードを終了する（キャンセル）
-              // 本来は変更前の値に戻す処理を入れますが、まずはモード解除だけでOK
-              if(meta?.renamingStatus.previousValue) {
-                meta.updateRowName(fileItem.id, meta?.renamingStatus.previousValue)
+    return (<div className="flex w-full rounded-md hover:bg-sidebar-accent ml-3">
+      <HugeiconsIcon icon={displayIcon} className="shrink-0"/>
+      { isCurrentRowRenaming ? (
+          <Input 
+            id="renamingFileName" 
+            autoComplete="off" 
+            ref={(el) => {
+              // autoFocusの代替動作
+              if (el) {
+                setTimeout(() => el.focus(), 0);
               }
+            }}
+            value={meta?.tableData?.find((item: any) => item.id === fileItem.id)?.fileName ?? ""}
+            onClick={(evt) => evt.stopPropagation()} 
+            onChange={(evt) => {
+              // 💡 王様に直接データを書き換えてもらう
+              meta.updateRowName(fileItem.id, evt.target.value)
+            }}
+            onBlur={() => {
               meta.setRenamingStatus({
                 isRenaming: false
               });
-            }
-          }}
-        />
-      ) : (
-        <span className="ml-3 mr-3">{fileItem.fileName}</span>
-      )
+            }}
+            onKeyDown={(evt) => {
+              if (evt.key === "Enter") {
+                evt.preventDefault();
+                meta.setRenamingStatus({
+                  isRenaming: false
+                });
+              }
+
+              if (evt.key === "Escape") {
+                evt.preventDefault();
+                // 2. Escが押されたら、編集モードを終了する（キャンセル）
+                // 本来は変更前の値に戻す処理を入れますが、まずはモード解除だけでOK
+                if(meta?.renamingStatus.previousValue) {
+                  meta.updateRowName(fileItem.id, meta?.renamingStatus.previousValue)
+                }
+                meta.setRenamingStatus({
+                  isRenaming: false
+                });
+              }
+            }}
+            />
+        ) : (
+          fileItem.link ?
+            <Link href={fileItem.link} className="ml-3 mr-3">{fileItem.fileName}</Link> :
+            <span className="ml-3 mr-3 ">{fileItem.fileName}</span>
+        )}
+      </div>
     )
   },
   minSize: 100,

@@ -1,4 +1,4 @@
-import { Geist, Geist_Mono, Inter } from "next/font/google"
+import { Geist_Mono, Inter } from "next/font/google"
 
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
 import { AppSidebar } from "@/components/app-sidebar"
+import { Providers } from "./providers";
  
 
 const inter = Inter({subsets:['latin'],variable:'--font-sans'})
@@ -14,6 +15,7 @@ const fontMono = Geist_Mono({
   subsets: ["latin"],
   variable: "--font-mono",
 })
+
 
 export default function RootLayout({
   children,
@@ -32,7 +34,7 @@ export default function RootLayout({
           <main>
             <ThemeProvider/>
             <SidebarTrigger />
-            {children}
+            <Providers>{children}</Providers>
           </main>
         </SidebarProvider>
       </body>

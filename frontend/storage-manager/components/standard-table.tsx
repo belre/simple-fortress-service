@@ -15,10 +15,12 @@ import {
   Table,
   TableBody,
   TableCell,
+  TableFooter,
   TableHead,
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { MoreVertical } from "lucide-react"
 
 
 
@@ -31,6 +33,8 @@ interface DataTableProps<TData extends GeneralRow, TValue> {
   data: TData[]
   focusId?: string | null
   onRowSelected?: React.Dispatch<React.SetStateAction<string | null>>
+  onPaginationTriggered?: React.Dispatch<React.SetStateAction<string | null>>
+  paginationCursor: string | null
   meta?: any;
 }
 
@@ -40,6 +44,8 @@ export function DataTableSheet<TData extends GeneralRow, TValue>({
   data,
   focusId,
   onRowSelected,
+  onPaginationTriggered,
+  paginationCursor,
   meta
 }: DataTableProps<TData, TValue>) {
   const [rowSelection, setRowSelection] = React.useState({})
@@ -125,6 +131,23 @@ export function DataTableSheet<TData extends GeneralRow, TValue>({
                 </TableRow>
               )}
             </TableBody>
+            <TableFooter>
+              <TableRow>
+                <TableCell colSpan={columns.length}>
+                  {paginationCursor ? 
+                    (<div className="flex w-full justify-center items-center" onClick={(evt) => {
+                        evt.preventDefault()
+                        if(!onPaginationTriggered) {
+                          return
+                        }
+                        onPaginationTriggered(null)
+                      }}>
+                      <MoreVertical />
+                    </div>) : (<span/>)
+                  }
+                </TableCell>
+              </TableRow>
+            </TableFooter>
           </Table>
         </div>
       </div>
