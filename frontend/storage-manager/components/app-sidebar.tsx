@@ -14,21 +14,21 @@ import {
 } from "@/components/ui/sidebar"
 
 import { HugeiconsIcon } from '@hugeicons/react'
-import { Plus, Star, Delete, Folder, BucketIcon } from "@hugeicons/core-free-icons"
+import { Folder, Question } from "@hugeicons/core-free-icons"
 import { ChevronRight, ChevronDown } from 'lucide-react';
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible"
-import { AllowedResourceType, StorageDirectoryIndexed } from "@/models/storage";
+import { StorageDirectoryIndexed } from "@/models/storage";
 import { awsStorageMockMetadata } from "@/mock/path-resolver.mock";
 import React from "react";
 import { FileOperationMenu } from "./file-operation-menu";
 import { describeLargeIcon, StorageServiceIconObject } from "./storages/fileitem-columns";
 
 interface TmpStorageDirectoryIndexed extends StorageDirectoryIndexed {
-  icon: StorageServiceIconObject
+  icon: StorageServiceIconObject | null
   directory: Array<TmpStorageDirectoryIndexed> | null
 }
 
@@ -97,7 +97,7 @@ export function AppSidebar() {
                           }}>
                           <SidebarMenuButton className="min-w-0 flex-1 justify-start">
                             <FileOperationMenu storageMetadata={project}>
-                              <HugeiconsIcon icon={project.icon} className="shrink-0" />
+                              <HugeiconsIcon icon={project.icon ?? Question} className="shrink-0" />
                             </FileOperationMenu>
                             <CollapsibleTrigger asChild>
                               <span className="truncate">{project.resourceName}</span>
@@ -119,7 +119,7 @@ export function AppSidebar() {
                                       evt.preventDefault()
                                     }}>
                                       <FileOperationMenu storageMetadata={child}>
-                                        <HugeiconsIcon icon={child.icon} className="shrink-0" />
+                                        <HugeiconsIcon icon={child.icon ?? Question} className="shrink-0" />
                                       </FileOperationMenu>
                                       <StorageLink
                                         storageWorkspace={project}

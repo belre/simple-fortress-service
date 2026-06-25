@@ -8,6 +8,7 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
 import { AppSidebar } from "@/components/app-sidebar"
 import { Providers } from "./providers";
  
+import * as React from "react"
 
 const inter = Inter({subsets:['latin'],variable:'--font-sans'})
 
@@ -15,6 +16,7 @@ const fontMono = Geist_Mono({
   subsets: ["latin"],
   variable: "--font-mono",
 })
+
 
 
 export default function RootLayout({

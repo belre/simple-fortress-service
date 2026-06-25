@@ -62,7 +62,7 @@ export type FileItem = {
 	fileName: string
   updatedAt: string,
   status: "syncing" | "completed"
-  icon?: StorageServiceIconObject
+  icon?: StorageServiceIconObject | null
   link?: string | null
 }
 
@@ -158,7 +158,11 @@ export const fileItemColumns: ColumnDef<FileItem>[] = [
             />
         ) : (
           fileItem.link ?
-            <Link href={fileItem.link} className="ml-3 mr-3">{fileItem.fileName}</Link> :
+            <div className="ml-3 mr-3"
+              onClick={async () => {
+                meta?.validateToAllowRedirect(fileItem.id)
+              }}
+              >{fileItem.fileName}</div> :
             <span className="ml-3 mr-3 ">{fileItem.fileName}</span>
         )}
       </div>
