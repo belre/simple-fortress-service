@@ -10,6 +10,7 @@ import { Providers } from "./providers";
  
 import * as React from "react"
 
+
 const inter = Inter({subsets:['latin'],variable:'--font-sans'})
 
 const fontMono = Geist_Mono({

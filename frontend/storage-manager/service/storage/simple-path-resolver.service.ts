@@ -1,8 +1,8 @@
-import { CreatingStorageIndex, StorageDirectoryIndexed } from "@/models/storage";
-import { PathResolveDto, PathResolveRequest } from "./simple-path-resolver.dto";
 
-import { awsStorageMockMetadata } from "@/mock/path-resolver.mock";
-import { IIndexCollector, IndexCollectionCrudResult, IndexCollectionListResult, IndexCollectionResolveResult } from "@/models/storage-behavior";
+import { StorageDirectoryIndexed } from "@/models/storage";
+
+import { generateMockData } from "@/mock/path-resolver.mock";
+import { IIndexCollector, IndexCollectionListResult, IndexCollectionResolveResult } from "@/models/storage-behavior";
 
 
 export class SimplePathResolverService implements IIndexCollector {
@@ -25,34 +25,8 @@ export class SimplePathResolverService implements IIndexCollector {
         })
     }
 
-    async _resolve(request: PathResolveRequest) : Promise<PathResolveDto> {
-        const mock = awsStorageMockMetadata
-
-        const targets = mock
-            .map(metadata => [...
-                this.traverse(
-                    metadata.directory ?? [], metadata), 
-                    metadata
-                ])
-            .flat()
-            .filter(metadata => metadata?.pathId === request.pathId)
-
-        if(targets.length != 1) {
-            return {
-                result: 'error',
-                reason: `Not found pathId=${request.pathId}`
-            }
-        }
-        
-        const target = targets[0]
-        return {
-            result: 'success',
-            directory: target
-        }
-    }
-
     async resolve(pathId: string, childLimit?: number) : Promise<IndexCollectionResolveResult> {
-        const mock = awsStorageMockMetadata
+        const mock = generateMockData()
 
         const targets = mock
             .map(metadata => [...
@@ -70,7 +44,7 @@ export class SimplePathResolverService implements IIndexCollector {
             }
         }
         
-        const target = {...targets[0]}
+        const target = targets[0]
         let cursor = undefined
         if(target.directory) {
             const actualLimit = childLimit ?? 10
@@ -90,7 +64,7 @@ export class SimplePathResolverService implements IIndexCollector {
     }
 
     async listIndexes(cursor: string, limit?: number) : Promise<IndexCollectionListResult> {
-        const mock = awsStorageMockMetadata;
+        const mock = generateMockData()
         const limitSize = limit ?? 10;
 
         // 1. ツリーの全ノードを平坦化
@@ -149,17 +123,6 @@ export class SimplePathResolverService implements IIndexCollector {
             count: targetList.length
         };
     }
-    
-    async pushIndex(newIndex: CreatingStorageIndex) : Promise<IndexCollectionCrudResult> {
-        throw new Error("Not Implemented")
-    }
-    async insertIndex(newIndex: CreatingStorageIndex, pathId: string | null) : Promise<IndexCollectionCrudResult> {
-        throw new Error("Not Implemented")
-    }
-    async popIndex(pathId: string) : Promise<IndexCollectionCrudResult> {
-        throw new Error("Not Implemented")
-    }
-
 
 }
 

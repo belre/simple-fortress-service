@@ -1,12 +1,13 @@
 "use client"; // 👈 クライアントの動きはここに完全隔離！
 
+export const dynamic = "force-dynamic"
+
 import * as React from "react";
-import { GeneralRow, DataTableSheet } from "@/components/standard-table"; // あなたの作ったDataTable
+import { DataTableSheet } from "@/components/standard-table"; // あなたの作ったDataTable
 
 import { Separator } from "@/components/ui/separator"
-import { SimplePathResolverService } from "@/service/storage/simple-path-resolver.service";
 
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 import { describeLargeIcon, FileItem, fileItemColumns, RenamingStatus } from "@/components/storages/fileitem-columns"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -16,9 +17,10 @@ import { useFileUpload } from "@/hooks/use-file-upload";
 import { Progress } from "@/components/ui/progress"
 import { Toaster } from "@/components/ui/sonner"
 import { toast } from "sonner"
-import { useStorageApiFactoryFromEnv } from "@/hooks/use-storage-api-factory";
 import { ModalBlurPanel } from "./modal-panel";
 import { IndexCollectionResolveResult } from "@/models/storage-behavior";
+import { useIndexing } from "@/hooks/use-file-access";
+import { StorageApiFactory } from "@/service/storage/api-factory.service";
 
 interface QueryParameter {
   resource_name?: string
@@ -29,7 +31,8 @@ interface FileWorkspacePanelProps {
   queryParameter?: QueryParameter
   current: IndexCollectionResolveResult
   workDirectoryPathId: string | null
-  resourceName: string | null
+  resourceName: string
+  resourceType: AllowedResourceType
 }
 
 interface FetchStatus {
@@ -41,36 +44,6 @@ interface FetchStatus {
 }
 
 
-function ClientPart() {
-  // useEffect ではなくレンダリング中に実行
-  console.log('[PageA] レンダリングされた');
-
-  React.useEffect(() => {
-    console.log('[PageA] useEffect 発火');
-  }, []);
-
-  return <div>...</div>;
-}
-
-const fetchFilePath = async (pathId?: string | null) => {
-  if(!pathId) {
-    return null
-  }
-
-  const service = new SimplePathResolverService()
-  const result = await service.resolve(pathId, 2)
-  return result ?? null
-}
-
-const paginateFilePath = async (cursor?: string | null) => {
-  if(!cursor) {
-    return null
-  }
-
-  const service = new SimplePathResolverService()
-  const result = await service.listIndexes(cursor, 1)
-  return result ?? null
-}
 
 const convertToFileItem = (resourceName?: string | null, dirs?: StorageDirectoryIndexed[]) : FileItem[] => {
   if(!resourceName)
@@ -89,14 +62,15 @@ const convertToFileItem = (resourceName?: string | null, dirs?: StorageDirectory
 }
 
 
-function FileWorkspacePanelContent<TData extends GeneralRow>({ 
+function FileWorkspacePanelContent({ 
   queryParameter,
   current,
   workDirectoryPathId, 
   resourceName, 
+  resourceType
 } : FileWorkspacePanelProps) {
-  const storageApiFactory = useStorageApiFactoryFromEnv()
-  const router = useRouter()
+  const storageApiFactory = StorageApiFactory.createStorageApiFactoryFromEnv()
+  const [isPending, startTransition] = React.useTransition()
 
   // 💡 テーブルのフォーカスや遅延制御の状態は、このパネルが王様として管理する
   const [focusedId, setFocusedId] = React.useState<string | null>(null)
@@ -105,31 +79,37 @@ function FileWorkspacePanelContent<TData extends GeneralRow>({
   const renameStatusState = React.useState<RenamingStatus>({
     isRenaming: false,
   })
-  const [renamingStatus, setRenamingStatus] = renameStatusState
-  const [uploadingStatus, setUploadingStatus] = React.useState<UploadInteraction>({
+  const [ renamingStatus, setRenamingStatus] = renameStatusState
+  const [ uploadingStatus, setUploadingStatus] = React.useState<UploadInteraction>({
     isUploading: false
   })
 
-  const [errorMessage, setErrorMessage] = React.useState<string | null>(null)
+  const [ errorMessage, setErrorMessage] = React.useState<string | null>(null)
+  const {
+    paginateFilePath,
+    syncWorkspaceAfterMutation,
+    validateToAllowRedirect 
+  } = useIndexing(storageApiFactory, resourceName, resourceType, () => {
+    setErrorMessage("File Access Error")
+  })
 
-  const allowedResourceType = current?.data?.resourceType as AllowedResourceType
   const [fetchStatus, setFetchStatus] = React.useState<FetchStatus>({
-    resourceType: allowedResourceType,
+    resourceType: resourceType,
     prevWorkDirectoryPathId: workDirectoryPathId,
     targetPathName: `s3://${resourceName}${current?.data?.name}`,
     tableData: convertToFileItem(resourceName, current?.data?.directory ?? []),
     lastCursor: current?.childCursor ?? null
   })
 
-  const [isPending, startTransition] = React.useTransition()
-
-
-  const { mutate: mutateUpload, progress, status} = useFileUpload(storageApiFactory, fetchStatus.resourceType)
+  const { mutate: mutateUpload, progress, uploadStatus} = useFileUpload(storageApiFactory, fetchStatus.resourceType)
   React.useEffect(() => {
-    if(status.status == "completed"){
-      toast.success("アップロードが完了しました")
+    if(uploadStatus.status != "completed" || !workDirectoryPathId) {
+      return
     }
-  }, [status.status])
+
+    toast.success("アップロードが完了しました")
+    syncWorkspaceAfterMutation(workDirectoryPathId)
+  }, [uploadStatus.status])
 
   return (
     // ただのdivではなく、役割を持った「ワークスペースの背景」として定義
@@ -242,25 +222,19 @@ function FileWorkspacePanelContent<TData extends GeneralRow>({
               "tableData" : updatedRows
             })
           },
-          validateToAllowRedirect: (fileId: string) => {
+          validateToAllowRedirect: (id: string)=>{
             startTransition(async () => {
-              const nextTargetFetched = await fetchFilePath(fileId)
-              if((nextTargetFetched?.result ?? "error") == "error"){
-                setErrorMessage("Data Fetch Error")
-                return
-              }
-              router.push(`/storages?resource_name=${resourceName}&path_id=${encodeURIComponent(fileId)}`)
+              await validateToAllowRedirect(id)
             })
           }
         }}
       />
-      <ClientPart/>
     </div>
  );
 }
 
 
-export function FileWorkspacePanel<TData extends GeneralRow>({ workDirectoryPathId, resourceName, current }: FileWorkspacePanelProps) {
+export function FileWorkspacePanel({ workDirectoryPathId, resourceName, resourceType, current }: FileWorkspacePanelProps) {
   const searchParams = useSearchParams()
   const queryParameter = Object.fromEntries(searchParams.entries()) as QueryParameter
 
@@ -269,6 +243,7 @@ export function FileWorkspacePanel<TData extends GeneralRow>({ workDirectoryPath
     queryParameter={queryParameter}
     workDirectoryPathId={workDirectoryPathId}
     resourceName={resourceName}
+    resourceType={resourceType}
     current={current}
   />);
 }

@@ -1,8 +1,7 @@
 
-export type FactoryUseCase = 
-    "Mock" | "Portfolio"
 
 export type AllowedResourceType = 
+    "seed-indexer" |        // -- 他のresource_typeのunionとして構成される
     "s3-prefix" | "s3-folder" | "aws-favorites" | "aws-trashes"
 
 

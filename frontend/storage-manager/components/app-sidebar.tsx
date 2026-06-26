@@ -22,7 +22,7 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible"
 import { StorageDirectoryIndexed } from "@/models/storage";
-import { awsStorageMockMetadata } from "@/mock/path-resolver.mock";
+import { generateMockData } from "@/mock/path-resolver.mock";
 import React from "react";
 import { FileOperationMenu } from "./file-operation-menu";
 import { describeLargeIcon, StorageServiceIconObject } from "./storages/fileitem-columns";
@@ -34,7 +34,7 @@ interface TmpStorageDirectoryIndexed extends StorageDirectoryIndexed {
 
 
 const storageAlignments : Record<string, Array<TmpStorageDirectoryIndexed>> = {
-  "AWS": awsStorageMockMetadata.map(metadata => {
+  "AWS": generateMockData().map(metadata => {
     return {
       ...metadata,
       icon: describeLargeIcon(metadata.resourceType),

@@ -51,7 +51,7 @@ export function useFileUpload(
 			}
 		}
 	})
-	return {...mutation, progress, status}
+	return {...mutation, progress, uploadStatus: status}
 }
 
 

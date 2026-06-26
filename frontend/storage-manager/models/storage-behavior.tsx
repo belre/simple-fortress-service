@@ -70,6 +70,15 @@ export type UploadEventHandler<T extends UploadEventType = UploadEventType> = (
   event: Extract<UploadEvent, { type: T }>
 ) => void;
 
+export interface IndexCollectionCallbackPayload {
+    type: IndexCollectionEventType
+    result: IndexCollectionResolveResult
+}
+
+
+export type IndexCollectionEventType = 
+  "validation_error"
+
 export interface IndexCollectionResolveResult {
   result: "success" | "error"
   data: StorageDirectoryIndexed | null
@@ -99,9 +108,6 @@ export interface IFileUploader {
 export interface IIndexCollector {
   resolve(pathId: string, childLimit?: number) : Promise<IndexCollectionResolveResult>
   listIndexes( cursor: string,  limit?: number) : Promise<IndexCollectionListResult>
-  pushIndex(newIndex: CreatingStorageIndex) : Promise<IndexCollectionCrudResult>
-  insertIndex(newIndex: CreatingStorageIndex, pathId: string | null) : Promise<IndexCollectionCrudResult>
-  popIndex(pathId: string) : Promise<IndexCollectionCrudResult>
 }
 
 export interface IStorageApiFactory {

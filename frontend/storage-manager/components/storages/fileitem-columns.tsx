@@ -46,7 +46,6 @@ export const describeLargeIcon = (resourceType: AllowedResourceType | string | u
 import { Input } from "@/components/ui/input"
 import { AllowedResourceType } from "@/models/storage"
 import { HugeiconsIcon } from "@hugeicons/react"
-import Link from "next/link"
 
 
 declare module "@tanstack/react-table" {
@@ -161,8 +160,7 @@ export const fileItemColumns: ColumnDef<FileItem>[] = [
             <div className="ml-3 mr-3"
               onClick={async () => {
                 meta?.validateToAllowRedirect(fileItem.id)
-              }}
-              >{fileItem.fileName}</div> :
+              }}>{fileItem.fileName}</div> :
             <span className="ml-3 mr-3 ">{fileItem.fileName}</span>
         )}
       </div>
