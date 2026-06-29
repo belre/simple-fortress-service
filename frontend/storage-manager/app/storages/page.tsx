@@ -5,8 +5,7 @@ import { redirect } from "next/navigation";
 import { ClientPart } from "@/components/debugger";
 import { StorageApiFactory } from "@/service/storage/api-factory.service";
 import { AllowedResourceType } from "@/models/storage";
-
-import { v4 } from "uuid";
+import { SessionProvider } from "@/components/session-provider";
 
 interface PageProps {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
@@ -18,9 +17,10 @@ interface QueryParameter {
   path_id?: string
 }
 
+
 export default async function Page({ searchParams }: PageProps) {
   const resolvedParams = (await searchParams) as QueryParameter
-  
+
   if(!resolvedParams?.path_id || !resolvedParams?.resource_name) {
     redirect(`/`)
   }
@@ -41,18 +41,26 @@ export default async function Page({ searchParams }: PageProps) {
   if (!resourceType) {
     redirect(`/`)
   }
+  
+
+
 
   return (
-    <div className="container mx-auto">
-      <FileWorkspacePanel 
-        key={v4()}
-        queryParameter={resolvedParams}
-        resourceType={resourceType} // 💡 サーバーが見破った真のタイプ
-        resourceName={resolvedParams.resource_name}
-        workDirectoryPathId={resolvedParams.path_id ?? null}
-        current={seedResolution}     // 💡 1回で取れた初期データをそのまま流し込む！
-      />
-      <ClientPart/>
+    <div className="container mx-auto w-full h-screen">
+      <SessionProvider
+          resourceType={resourceType}
+          resourceName={resolvedParams.resource_name}
+          workDirectoryPathId={resolvedParams.path_id ?? null}
+          current={seedResolution}>
+        <FileWorkspacePanel 
+          queryParameter={resolvedParams}
+          resourceType={resourceType}
+          resourceName={resolvedParams.resource_name}
+          workDirectoryPathId={resolvedParams.path_id ?? null}
+          current={seedResolution}
+        />
+        <ClientPart/>
+      </SessionProvider>
     </div>
   )
 }

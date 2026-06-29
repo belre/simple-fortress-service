@@ -11,6 +11,8 @@ import { Providers } from "./providers";
 import * as React from "react"
 
 
+import { v4 } from "uuid";
+
 const inter = Inter({subsets:['latin'],variable:'--font-sans'})
 
 const fontMono = Geist_Mono({
@@ -20,7 +22,8 @@ const fontMono = Geist_Mono({
 
 
 
-export default function RootLayout({
+
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode

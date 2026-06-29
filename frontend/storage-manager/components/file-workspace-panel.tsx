@@ -21,6 +21,10 @@ import { ModalBlurPanel } from "./modal-panel";
 import { IndexCollectionResolveResult } from "@/models/storage-behavior";
 import { useIndexing } from "@/hooks/use-file-access";
 import { StorageApiFactory } from "@/service/storage/api-factory.service";
+import { useAtom } from "jotai";
+import { sessionAtom } from "@/app/actions-session";
+import { v4 } from "uuid";
+import { counterAtom, uploadingStatusAtom } from "@/atoms/session-atoms";
 
 interface QueryParameter {
   resource_name?: string
@@ -80,9 +84,7 @@ function FileWorkspacePanelContent({
     isRenaming: false,
   })
   const [ renamingStatus, setRenamingStatus] = renameStatusState
-  const [ uploadingStatus, setUploadingStatus] = React.useState<UploadInteraction>({
-    isUploading: false
-  })
+  const [ uploadingStatus, setUploadingStatus] = useAtom(uploadingStatusAtom)
 
   const [ errorMessage, setErrorMessage] = React.useState<string | null>(null)
   const {
