@@ -1,24 +1,24 @@
-import { IStorageApiFactory, UploadEventHandler,  UploadStatus } from "@/models/storage-behavior";
+import { IStorageApiFactory, UploadEventHandler } from "@/models/storage-behavior";
 import { useMutation } from "@tanstack/react-query";
 
 import * as React from "react"
 import { AllowedResourceType } from "@/models/storage";
+import { ManagedUploadStatus, uploadingStatusAtom } from "@/atoms/session-atoms";
+import { useAtom } from "jotai";
 
-export interface ManagedUploadStatus{
-	status: UploadStatus;
-	previousStatus : UploadStatus | null
-}
 
 export function useFileUpload( 
 	storageApiFactory: IStorageApiFactory, 
 	resourceType: AllowedResourceType | null
 ){
 	const [progress, setProgress] = React.useState<number>(0)
-	const [status, setStatus] = React.useState<ManagedUploadStatus>({
-  		status: "idle", 
-  		previousStatus: null
-	})
 
+	const [ uploadStatusTracker, setUploadStatusTracker] = React.useState<ManagedUploadStatus>({
+    	status: "idle",
+    	previousStatus: null
+	})
+	console.log('[useFileUpload] uploadStatus:', uploadStatusTracker)
+	
 	const mutation = useMutation({
 		mutationFn: async( file: File) => {
 			if(!resourceType) {
@@ -33,9 +33,9 @@ export function useFileUpload(
 				}
 			const handleStatusChanged : UploadEventHandler<"status_changed"> =
 				(event) => {
-					setStatus({
+					setUploadStatusTracker({
   						status: event.status,
-  						previousStatus: status.status
+  						previousStatus: uploadStatusTracker.status
 					})
 				}
 
@@ -51,7 +51,7 @@ export function useFileUpload(
 			}
 		}
 	})
-	return {...mutation, progress, uploadStatus: status}
+	return {...mutation, progress, uploadStatusTracker} //, uploadingStatus, setUploadingStatus}
 }
 
 

@@ -26,6 +26,9 @@ import { generateMockData } from "@/mock/path-resolver.mock";
 import React from "react";
 import { FileOperationMenu } from "./file-operation-menu";
 import { describeLargeIcon, StorageServiceIconObject } from "./storages/fileitem-columns";
+import { uploadingStatusAtom } from "@/atoms/session-atoms";
+import { useAtom } from "jotai";
+import { useRouter } from "next/navigation";
 
 interface TmpStorageDirectoryIndexed extends StorageDirectoryIndexed {
   icon: StorageServiceIconObject | null
@@ -57,19 +60,31 @@ interface StorageLinkProps {
 
 const StorageLink = ( props : StorageLinkProps) : React.ReactElement => {
   /* 👇 矢印側：shrink-0 をつけて、ボタンの幅に潰されないようにガードします */
+  const router = useRouter()
   return (
     <div className="inline-flex items-center justify-center ">
       {
         props.storageWorkspace.routingTarget ? 
-        <a 
-          href={`${props.storageWorkspace.routingTarget}?resource_name=${props.storageWorkspace.resourceName}&path_id=${props.storageTarget.pathId}`} 
+        <div 
+          onClick={(evt) => {
+            router.push(`${props.storageWorkspace.routingTarget}?resource_name=${props.storageWorkspace.resourceName}&path_id=${props.storageTarget.pathId}`)
+          }}
           className="flex p-2 text-sidebar-foreground/50 hover:text-sidebar-foreground"
         >
           {props.children}
-        </a> : <span className="p-2"/>
+        </div> : <span className="p-2"/>
       }
     </div> )
 }
+
+/***
+ * const [uploadingStatus, setUploadingStatus] = useAtom(uploadingStatusAtom)
+
+  console.log('[before push] uploadingStatus:', uploadingStatus)
+  console.log('[after push] uploadingStatus:', uploadingStatus)
+  
+ * 
+ */
 
 export function AppSidebar() {
   return (

@@ -42,7 +42,6 @@ export function useIndexing(
         router.refresh()
     }
 
-
     const validateToAllowRedirect = async (targetFileId: string) => {
         const nextTargetFetched = await fetchFilePath(targetFileId)
         if((nextTargetFetched?.result ?? "error") == "error"){

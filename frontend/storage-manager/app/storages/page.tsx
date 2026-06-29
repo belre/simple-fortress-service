@@ -6,6 +6,7 @@ import { ClientPart } from "@/components/debugger";
 import { StorageApiFactory } from "@/service/storage/api-factory.service";
 import { AllowedResourceType } from "@/models/storage";
 import { SessionProvider } from "@/components/session-provider";
+import { getOrCreateFileSession } from "../actions-session";
 
 interface PageProps {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
@@ -20,7 +21,6 @@ interface QueryParameter {
 
 export default async function Page({ searchParams }: PageProps) {
   const resolvedParams = (await searchParams) as QueryParameter
-
   if(!resolvedParams?.path_id || !resolvedParams?.resource_name) {
     redirect(`/`)
   }
@@ -41,17 +41,18 @@ export default async function Page({ searchParams }: PageProps) {
   if (!resourceType) {
     redirect(`/`)
   }
-  
 
+  const session = await getOrCreateFileSession()
 
-
+  console.log('[親] レンダリング発火')
   return (
     <div className="container mx-auto w-full h-screen">
       <SessionProvider
-          resourceType={resourceType}
-          resourceName={resolvedParams.resource_name}
-          workDirectoryPathId={resolvedParams.path_id ?? null}
-          current={seedResolution}>
+        session={session}
+        resourceType={resourceType}
+        resourceName={resolvedParams.resource_name}
+        workDirectoryPathId={resolvedParams.path_id ?? null}
+        current={seedResolution}>
         <FileWorkspacePanel 
           queryParameter={resolvedParams}
           resourceType={resourceType}
@@ -59,7 +60,6 @@ export default async function Page({ searchParams }: PageProps) {
           workDirectoryPathId={resolvedParams.path_id ?? null}
           current={seedResolution}
         />
-        <ClientPart/>
       </SessionProvider>
     </div>
   )
