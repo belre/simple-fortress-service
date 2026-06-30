@@ -1,10 +1,18 @@
 
+import { AllowedResourceType } from "@/models/storage";
 import { 
   IFileUploader, 
   UploadEvent, 
   UploadEventType, 
   UploadResult,
-  UploadEventHandler,
+  IFileOperation,
+  FileOperationEventType,
+  AllAllowedFileEventType,
+  FileEventHandler,
+  IFileEventEmittable,
+  FileMoveResult,
+  FileCopyResult,
+  FileDeleteResult,
 } from "@/models/storage-behavior";
 
 
@@ -30,14 +38,22 @@ async function* readChunks(reader: ReadableStreamDefaultReader, signal: AbortSig
     }
 }
 
-export class SimpleUploader implements IFileUploader {
-  private _listeners = new Map<UploadEventType, Set<Function>>
+export class SimpleUploader implements IFileUploader, IFileOperation {
+  private _listeners = new Map<AllAllowedFileEventType, Set<Function>>
+  private _resourceType : AllowedResourceType
+
+  /**
+   *
+   */
+  constructor(resourceType: AllowedResourceType) {
+    this._resourceType = resourceType
+  }
 
   private _emit(payload: UploadEvent) : void{
     this._listeners.get(payload.type)?.forEach(
       handler => handler(payload))
   }
-
+  
   async upload(file: File) : Promise<UploadResult> {
     this._emit({
       type: "started",
@@ -51,7 +67,7 @@ export class SimpleUploader implements IFileUploader {
     const decoder = new TextDecoder()
     
     const controller = new AbortController()
-    const fetched = await fetch('api/storages/upload', {
+    const fetched = await fetch('api/files/upload', {
       method: 'POST',
       body: formData
     })
@@ -86,16 +102,86 @@ export class SimpleUploader implements IFileUploader {
     return result
   }
 
-  cancel() : void {
+  cancelUpload() : void {
     throw new Error("not implemented")
   }
+  
+  async move(pathId: string, newName: string) : Promise<FileMoveResult> {
+    try{
+      const fetched = await fetch(`api/files/${pathId}`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          resourceType: this._resourceType,
+          newName: newName
+        })
+      })
 
-  on<T extends UploadEventType>(event: T, handler: UploadEventHandler<T>) {
+      if(!fetched.ok) {
+        return {
+          result: 'error',
+          content: null,
+          error: {
+            message: fetched.statusText
+          }
+        }
+      }
+
+      const result = await fetched.json() as FileMoveResult
+      return result
+    } catch (e) {
+      const error = e as Error
+      return {
+        result: 'error',
+        content: null,
+        error: {
+          message: error?.message
+        }
+      }
+    }
+  }
+  async copy(pathId: string, newName: string) : Promise<FileCopyResult> {
+    throw new Error("not implemented")
+  }
+  async delete(pathId: string) : Promise<FileDeleteResult> {
+    try{
+      const fetched = await fetch(`api/files/${pathId}`, {
+        method: 'DELETE',
+        body: JSON.stringify({
+          resourceType: this._resourceType
+        })
+      })
+
+      if(!fetched.ok) {
+        return {
+          result: 'error',
+          isNoContent: false,
+          error: {
+            message: fetched.statusText
+          }
+        }
+      }
+
+      const result = await fetched.json() as FileDeleteResult
+      return result
+    } catch (e) {
+      const error = e as Error
+      return {
+        result: 'error',
+          isNoContent: false,
+        error: {
+          message: error?.message
+        }
+      }
+    }
+  }
+
+  on<T extends AllAllowedFileEventType>(event: T, handler: FileEventHandler<T>) {
     if( !this._listeners.has(event))  this._listeners.set(event, new Set())
     this._listeners.get(event)!.add(handler)
   }
-  
-  off<T extends UploadEventType>(event: T, handler: UploadEventHandler<T>) {
+
+
+  off<T extends AllAllowedFileEventType>(event: T, handler: FileEventHandler<T>) {
     this._listeners.get(event)?.delete(handler)
   }
 }

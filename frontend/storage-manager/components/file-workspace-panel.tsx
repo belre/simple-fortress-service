@@ -3,40 +3,54 @@
 import * as React from "react";
 import { DataTableSheet } from "@/components/standard-table"; // あなたの作ったDataTable
 import { Separator } from "@/components/ui/separator"
-import { describeLargeIcon, FileItem, fileItemColumns, RenamingStatus } from "@/components/storages/fileitem-columns"
+import { describeLargeIcon, FileItem, fileItemColumns } from "@/components/storages/fileitem-columns"
 import { Skeleton } from "@/components/ui/skeleton"
 import type { AllowedResourceType, StorageDirectoryIndexed } from "@/models/storage";
-import { useFileUpload } from "@/hooks/use-file-upload";
+import { useFileOperationEvent } from "@/hooks/use-file-operation";
 import { Progress } from "@/components/ui/progress"
 import { Toaster } from "@/components/ui/sonner"
-import { toast } from "sonner"
 import { ModalBlurPanel } from "./modal-panel";
-import { IndexCollectionResolveResult, UploadResult } from "@/models/storage-behavior";
+import { FileDeleteResult, FileMoveResult, IndexCollectionResolveResult, UploadResult } from "@/models/storage-behavior";
 import { useIndexing } from "@/hooks/use-file-access";
 import { StorageApiFactory } from "@/service/storage/api-factory.service";
-import { useAtom } from "jotai";
-import { errorMessageAtom, uploadingStatusAtom } from "@/atoms/session-atoms";
 import { UseMutateFunction } from "@tanstack/react-query";
+import { DeleteStatus, RenamingStatus } from "@/models/storage-interaction";
 
 
 interface FileWorkspacePanelProps {
   current: IndexCollectionResolveResult
-  workDirectoryPathId: string | null
+  workDirectoryPathId?: string | null
   resourceName: string
   resourceType: AllowedResourceType
 }
 
-interface FetchStatus {
-  resourceType: AllowedResourceType | null
-  prevWorkDirectoryPathId: string | null
-  targetPathName?: string
-  tableData?: FileItem[]
-  lastCursor?: string | null
+interface FileWorkspacePanelContentProps {
+  current: IndexCollectionResolveResult
+  resourceName: string
+  resourceType: AllowedResourceType
+  renameStatus: RenamingStatus
+  deleteStatus: DeleteStatus
+  onRenameStart: ( {pathId, currentFileName} : { pathId: string, currentFileName: string}) => void
+  onRenameAbort: ( fileItem: FileItem ) => void
+  onRenameSubmit: ( {pathId, newName, fileItem} : {pathId: string, newName: string, fileItem: FileItem}) => Promise<FileMoveResult | null>
+  mutateDelete: UseMutateFunction<FileDeleteResult | null, Error, string, unknown>,
 }
+
+
 
 const convertToFileItem = (resourceName?: string | null, dirs?: StorageDirectoryIndexed[]) : FileItem[] => {
   if(!resourceName)
     return []
+
+  const getLink = (d: StorageDirectoryIndexed) => {
+    switch(d.resourceType) {
+      case "s3-folder":
+      case "s3-prefix":
+        return `/storages?resource_name=${resourceName}&path_id=${encodeURIComponent( d.pathId )}`
+      default:
+        return null
+    }
+  }
 
   return ( dirs ?? [] ).map( d => {
     return {
@@ -45,10 +59,13 @@ const convertToFileItem = (resourceName?: string | null, dirs?: StorageDirectory
       updatedAt: d.updatedAt ?? "",
       status: d.status,
       icon: describeLargeIcon(d.resourceType),
-      link: d.resourceType == "s3-folder" ? `/storages?resource_name=${resourceName}&path_id=${encodeURIComponent( d.pathId )}` : null
+      link: getLink(d)
     }
   })
 }
+
+const storageApiFactory = StorageApiFactory.createStorageApiFactoryFromEnv()
+
 
 function InlineHeader({
   current, 
@@ -77,8 +94,12 @@ function DropdownBox({
   mutateUpload: UseMutateFunction<UploadResult | null, Error, File, unknown>,
   children: React.ReactNode
 }) {
-  const [ uploadingStatus, setUploadingStatus] = useAtom(uploadingStatusAtom)
-  const [ errorMessage, setErrorMessage] = useAtom(errorMessageAtom)
+  const [ dropStatus, setDropStatus] = React.useState<{
+    isDropping: boolean,
+    uploadingCount?: number
+  }>({
+    isDropping: false
+  })
 
   return (
     <div className="outline-none w-full min-h-screen"
@@ -87,8 +108,8 @@ function DropdownBox({
 
         if(!resourceType) {
           console.warn("Failure to upload")
-          setUploadingStatus({
-            isUploading: false,
+          setDropStatus({
+            isDropping: false,
           })
           return
         }
@@ -96,33 +117,25 @@ function DropdownBox({
         const files = [...evt.dataTransfer.files]
         mutateUpload(files[0])
         
-        setUploadingStatus({
-          isUploading: false,
+        setDropStatus({
+          isDropping: false,
         })
       }}
       onDragOver={(evt) => {
         evt.preventDefault();
-        if (uploadingStatus.isUploading) return;
+        if (dropStatus.isDropping) return;
+
         const files = [...evt.dataTransfer.items].filter((item) => item.kind === "file")
         if (files.length !== 0) {
-          setUploadingStatus({
-            isUploading: true,
+          setDropStatus({
+            isDropping: true,
             uploadingCount: files.length
           })
         }
       }}>
-    <ModalBlurPanel props={{isVisible: uploadingStatus.isUploading}}>
-      <span>Uploading: {uploadingStatus.uploadingCount ?? 0} files</span> <br/>
+    <ModalBlurPanel props={{isVisible: dropStatus.isDropping}}>
+      <span>Uploading: {dropStatus.uploadingCount ?? 0} files</span> <br/>
     </ModalBlurPanel>
-
-    <ModalBlurPanel props={{isVisible: errorMessage != null}}>
-      <div className="flex size-full justify-center items-center" onClick={(evt) => {
-        setErrorMessage(null)
-      }}>
-        <span>{errorMessage}</span> <br/>
-      </div>
-    </ModalBlurPanel>
-
     {children}
     <Toaster />
   </div>)
@@ -141,38 +154,66 @@ function UploadProgressContent({
 
 function FileWorkspacePanelContent({ 
   current,
-  workDirectoryPathId, 
   resourceName, 
   resourceType,
-} : FileWorkspacePanelProps) {
-  const storageApiFactory = StorageApiFactory.createStorageApiFactoryFromEnv()
-  const [isPending, startTransition] = React.useTransition()
+  renameStatus,
+  deleteStatus,
+  onRenameStart,
+  onRenameAbort,
+  onRenameSubmit,
+  mutateDelete
+} : FileWorkspacePanelContentProps) {
+
+  const [ isPending, startTransition] = React.useTransition()
+
+  // 📍 Status管理を集約して表現する
+  const {
+    paginateFilePath,
+    validateToAllowRedirect,
+    accessError,
+    releaseError
+  } = useIndexing(storageApiFactory, resourceName, resourceType)
 
   // 💡 テーブルのフォーカスや遅延制御の状態は、このパネルが王様として管理する
   const [focusedId, setFocusedId] = React.useState<string | null>(null)
 
-  // 📍 Status管理を集約して表現する
-  const renameStatusState = React.useState<RenamingStatus>({
-    isRenaming: false,
-  })
-  const [ renamingStatus, setRenamingStatus] = renameStatusState
-  const [ errorMessage, setErrorMessage] = useAtom(errorMessageAtom)
-  const {
-    paginateFilePath,
-    validateToAllowRedirect 
-  } = useIndexing(storageApiFactory, resourceName, resourceType, () => {
-    setErrorMessage("File Access Error")
-  })
-
-  const [fetchStatus, setFetchStatus] = React.useState<FetchStatus>({
-    resourceType: resourceType,
-    prevWorkDirectoryPathId: workDirectoryPathId,
-    targetPathName: `s3://${resourceName}${current?.data?.name}`,
-    tableData: convertToFileItem(resourceName, current?.data?.directory ?? []),
-  })
-
-  const [ addedTableData, setAddedTableData] = React.useState<FileItem[]>([])
+  const [ addedTableData, setAddedTableData] = React.useState<FileItem[]>(
+    convertToFileItem(resourceName, current?.data?.directory ?? [])
+  )
   const [ lastCursor, setLastCursor] = React.useState<string | null>(current?.childCursor ?? null)
+
+  React.useEffect(() => {
+    startTransition(() => {
+      if(!renameStatus.targetPathId || !renameStatus.renamedValue) {
+        return
+      }
+
+      setAddedTableData(prev => 
+        prev.map(item => 
+          item.id === renameStatus.targetPathId 
+            ? { ...item, 
+              id: renameStatus.renamedId ?? item.id,
+              fileName: renameStatus.renamedValue ?? item.fileName
+            } : item
+          )
+      )
+    })
+  }, [renameStatus])
+ 
+  React.useEffect(() => {
+    startTransition(() => {
+      if(!deleteStatus.deletedId) {
+        return
+      }
+      setAddedTableData(prev => 
+          prev.map(item => 
+              item.id === deleteStatus.deletedId 
+                  ? { ...item, status: 'deleted' } 
+                  : item
+          )
+      )
+    })
+  }, [deleteStatus.deletedId])
 
   return (
     // ただのdivではなく、役割を持った「ワークスペースの背景」として定義
@@ -183,38 +224,44 @@ function FileWorkspacePanelContent({
         if (document.activeElement?.tagName === "INPUT") {
           return;
         }
+
+        if(!focusedId) {
+          return
+        }
+
+        const targets = addedTableData
+          .filter((item) => item.id === focusedId)
+
+        if(targets.length !== 1) {
+          console.warn("Target Renaming file not found")
+          return
+        }
+        const target = targets[0]
+
         if(evt.key == "F2") {
           if(focusedId) {
-            const targets = (fetchStatus?.tableData ?? [])
-              .filter((item) => item.id === focusedId)
-
-            if(targets.length !== 1) {
-              console.warn("Target Renaming file not found")
-              return
-            }
-
-            const target = targets[0]
-            setRenamingStatus({
-              isRenaming: true,
-              previousValue: target.fileName
+            onRenameStart({
+              pathId: target.id,
+              currentFileName: target.fileName,
             })
           }
+          return
+        }
+
+        if(evt.key === "Delete" && focusedId) {
+          mutateDelete(focusedId)
+          return
         }
       }}>
 
       <Separator />
       <DataTableSheet 
         columns={fileItemColumns}
-        data={[...(fetchStatus.tableData ?? []), ...addedTableData]} 
+        data={[...addedTableData]
+          .filter(d => d.status !== 'deleted')
+        } 
         focusId={focusedId}
-        onRowSelected={(newUuid) => {
-          if(newUuid != focusedId){
-            setRenamingStatus({
-              isRenaming: false
-            })
-          }
-          setFocusedId(newUuid)
-        }}
+        onRowSelected={setFocusedId}
         onPaginationTriggered={async () => {
           const result = await paginateFilePath(lastCursor)
           const newAddedTableData = convertToFileItem(resourceName, result?.indexes) ?? []
@@ -224,15 +271,15 @@ function FileWorkspacePanelContent({
         paginationCursor={lastCursor ?? null}
         meta={{
           focusedId,
-          renamingStatus,
-          setRenamingStatus,
-          tableData: fetchStatus.tableData,
+          renameStatus: renameStatus,
+          onRenameStart: onRenameStart,
+          onRenameAbort: onRenameAbort,
+          onRenameSubmit: onRenameSubmit,
+          mutateDelete: mutateDelete,
+          tableData: addedTableData,
           updateRowName: (rowId: string, newName: string) => {
-            const updatedRows = (fetchStatus.tableData ?? []).map((item) => item.id === rowId ? { ...item, fileName: newName } : item)
-            setFetchStatus({
-              ...fetchStatus,
-              "tableData" : updatedRows
-            })
+            const updatedRows = (addedTableData ?? []).map((item) => item.id === rowId ? { ...item, fileName: newName } : item)
+            setAddedTableData(updatedRows)
           },
           validateToAllowRedirect: (id: string)=>{
             startTransition(async () => {
@@ -241,24 +288,29 @@ function FileWorkspacePanelContent({
           }
         }}
       />
+      <ModalBlurPanel props={{isVisible: accessError != null}}>
+        <div className="flex size-full justify-center items-center" onClick={() => {
+          releaseError()
+        }}>
+          <span>{accessError}</span> <br/>
+        </div>
+      </ModalBlurPanel>
     </div>
  );
 }
 
 
 export function FileWorkspacePanel({ workDirectoryPathId, resourceName, resourceType, current }: FileWorkspacePanelProps) {
-  const storageApiFactory = StorageApiFactory.createStorageApiFactoryFromEnv()
   const { 
-    mutate: mutateUpload, 
+    mutateUpload, 
+    mutateDelete,
     progress, 
-    uploadStatusTracker,
-  } = useFileUpload(storageApiFactory, resourceType)
-  React.useEffect(() => {
-    if(uploadStatusTracker.status != "completed" || !workDirectoryPathId) {
-      return
-    }
-    toast.success("アップロードが完了しました")
-  }, [uploadStatusTracker.status, workDirectoryPathId])
+    renameStatus, 
+    deleteStatus,
+    onRenameStart,
+    onRenameAbort,
+    onRenameSubmit
+  } = useFileOperationEvent(storageApiFactory, resourceType)
 
   return (
     <div className="container">
@@ -275,9 +327,14 @@ export function FileWorkspacePanel({ workDirectoryPathId, resourceName, resource
         mutateUpload={mutateUpload}>
         <FileWorkspacePanelContent
           key={workDirectoryPathId}
-          workDirectoryPathId={workDirectoryPathId}
           resourceName={resourceName}
           resourceType={resourceType}
+          renameStatus={renameStatus}
+          deleteStatus={deleteStatus}
+          mutateDelete={mutateDelete}
+          onRenameStart={onRenameStart}
+          onRenameAbort={onRenameAbort}
+          onRenameSubmit={onRenameSubmit}
           current={current}
         />    
       </DropdownBox>

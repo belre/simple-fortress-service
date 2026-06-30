@@ -26,8 +26,6 @@ import { generateMockData } from "@/mock/path-resolver.mock";
 import React from "react";
 import { FileOperationMenu } from "./file-operation-menu";
 import { describeLargeIcon, StorageServiceIconObject } from "./storages/fileitem-columns";
-import { uploadingStatusAtom } from "@/atoms/session-atoms";
-import { useAtom } from "jotai";
 import { useRouter } from "next/navigation";
 
 interface TmpStorageDirectoryIndexed extends StorageDirectoryIndexed {
@@ -67,6 +65,7 @@ const StorageLink = ( props : StorageLinkProps) : React.ReactElement => {
         props.storageWorkspace.routingTarget ? 
         <div 
           onClick={(evt) => {
+            evt.preventDefault()
             router.push(`${props.storageWorkspace.routingTarget}?resource_name=${props.storageWorkspace.resourceName}&path_id=${props.storageTarget.pathId}`)
           }}
           className="flex p-2 text-sidebar-foreground/50 hover:text-sidebar-foreground"

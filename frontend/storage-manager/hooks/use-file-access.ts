@@ -1,6 +1,8 @@
 
+import * as React from 'react'
+
 import { AllowedResourceType } from "@/models/storage"
-import { IndexCollectionCallbackPayload, IndexCollectionListResult, IndexCollectionResolveResult, IStorageApiFactory } from "@/models/storage-behavior"
+import { IndexCollectionListResult, IndexCollectionResolveResult, IStorageApiFactory } from "@/models/storage-behavior"
 import { useRouter } from "next/navigation"
 
 
@@ -8,9 +10,13 @@ import { useRouter } from "next/navigation"
 export function useIndexing(
     storageApiFactory: IStorageApiFactory,
     resourceName: string, 
-    resourceType: AllowedResourceType,
-    errorCallback: React.Dispatch<IndexCollectionCallbackPayload>) {
+    resourceType: AllowedResourceType) {
     const router = useRouter()
+
+    const [accessError, setAccessError] = React.useState<string | null>(null)
+    const releaseError = () => {
+        setAccessError(null)
+    }
 
     const collectorService = storageApiFactory.createIndexCollector(resourceType)
     const fetchFilePath = async ( pathId?: string | null ) 
@@ -39,16 +45,12 @@ export function useIndexing(
 
     const syncWorkspaceAfterMutation = (targetFileId: string) => {
         router.push(`/storages?resource_name=${resourceName}&path_id=${encodeURIComponent(targetFileId)}`);
-        router.refresh()
     }
 
     const validateToAllowRedirect = async (targetFileId: string) => {
         const nextTargetFetched = await fetchFilePath(targetFileId)
         if((nextTargetFetched?.result ?? "error") == "error"){
-            errorCallback( {
-                type: "validation_error", 
-                result: nextTargetFetched
-            })
+            setAccessError("File Access Failed")
             return
         }
         syncWorkspaceAfterMutation(targetFileId)
@@ -56,6 +58,8 @@ export function useIndexing(
 
 
     return {
+        accessError,
+        releaseError,
         fetchFilePath,
         paginateFilePath,
         syncWorkspaceAfterMutation,

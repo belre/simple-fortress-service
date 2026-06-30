@@ -12,8 +12,8 @@ export class SimplePathResolverService implements IIndexCollector {
         recursive=false) : StorageDirectoryIndexed[] {
 
         return children.map(child => {
-            child.resourceName = parent.resourceName
-            child.resourceType = parent.resourceType
+            //child.resourceName = parent.resourceName
+            //child.resourceType = parent.resourceType
 
             if(recursive) {
                 child.directory = child.directory?.

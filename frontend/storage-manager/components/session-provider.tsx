@@ -1,6 +1,6 @@
 'use client'
 
-import { getOrCreateFileSession } from '@/app/actions-session'
+import { getOrCreateFileSession } from "@/app/actions-session"
 import { Spinner } from "@/components/ui/spinner"
 import { AllowedResourceType } from '@/models/storage'
 import { IndexCollectionResolveResult } from '@/models/storage-behavior'
@@ -21,7 +21,18 @@ interface FileWorkspacePanelProps {
 export function SessionProvider(props : FileWorkspacePanelProps) { 
     console.log('[親] SessionProviderレンダリング発火')
 
+    const [isPending, startTransition] = React.useTransition()
+
     const [sessionData, setSessionData] = React.useState<string | null>(props.session)
+    
+    React.useEffect(() => {
+        startTransition(async () => {
+            const session = await getOrCreateFileSession()
+            setSessionData(session)
+            console.log(session)
+        })
+    }, [sessionData])
+
 
     return (sessionData ? 
         <div key={sessionData}>{props.children}</div> : 

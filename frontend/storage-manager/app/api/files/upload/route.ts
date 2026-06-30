@@ -14,7 +14,7 @@ function sleep(ms: number) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-// app/api/upload/route.ts
+// app/api/files/upload/route.ts
 export async function POST(request: Request) {
     const formData = await request.formData()
     //const file = formData.get('file') as File

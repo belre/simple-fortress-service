@@ -1,5 +1,5 @@
 import { AllowedResourceType } from "@/models/storage"
-import { IFileUploader, IIndexCollector, IStorageApiFactory } from "@/models/storage-behavior"
+import { IFileOperation, IFileUploader, IIndexCollector, IStorageApiFactory } from "@/models/storage-behavior"
 import { SimpleUploader } from "./simple-uploader.service"
 import { SimplePathResolverService } from "./simple-path-resolver.service"
 import { FactoryUseCase } from "./api-factory.dto"
@@ -10,7 +10,17 @@ class MockStorageApiFactory implements IStorageApiFactory {
     switch(resourceType) {
       case "s3-prefix":
       case "s3-folder":
-        return new SimpleUploader()
+        return new SimpleUploader(resourceType)
+      default:
+        throw new Error("not implemented")
+    }
+  }
+
+  createFileOperator(resourceType: AllowedResourceType): IFileOperation {
+    switch(resourceType) {
+      case "s3-prefix":
+      case "s3-folder":
+        return new SimpleUploader(resourceType)
       default:
         throw new Error("not implemented")
     }

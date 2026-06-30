@@ -60,15 +60,11 @@ export type FileItem = {
   id: string
 	fileName: string
   updatedAt: string,
-  status: "syncing" | "completed"
+  status: 'syncing' | 'completed' | 'deleted'
   icon?: StorageServiceIconObject | null
   link?: string | null
 }
 
-export interface RenamingStatus {
-  isRenaming: boolean
-  previousValue?: string
-}
 
 
 export const fileItemColumns: ColumnDef<FileItem>[] = [
@@ -107,7 +103,7 @@ export const fileItemColumns: ColumnDef<FileItem>[] = [
 
     // 💡 王様が meta に仕込んでくれた状態と関数をここで召喚する！
     const meta = table.options.meta as any
-    const isCurrentRowRenaming = meta?.renamingStatus.isRenaming && meta?.focusedId === fileItem.id
+    const isCurrentRowRenaming = meta?.renameStatus.isRenaming && meta?.focusedId === fileItem.id
     
     const displayIcon = fileItem.icon ?? File02Icon
 
@@ -130,35 +126,36 @@ export const fileItemColumns: ColumnDef<FileItem>[] = [
               meta.updateRowName(fileItem.id, evt.target.value)
             }}
             onBlur={() => {
-              meta.setRenamingStatus({
-                isRenaming: false
-              });
+              meta.onRenameAbort(fileItem)
             }}
-            onKeyDown={(evt) => {
+            onKeyDown={async (evt) => {
               if (evt.key === "Enter") {
                 evt.preventDefault();
-                meta.setRenamingStatus({
-                  isRenaming: false
-                });
+                await meta.onRenameSubmit({
+                  pathId: fileItem.id, 
+                  newName: fileItem.fileName,
+                  fileItem: fileItem
+                })
+                return
               }
 
               if (evt.key === "Escape") {
                 evt.preventDefault();
                 // 2. Escが押されたら、編集モードを終了する（キャンセル）
                 // 本来は変更前の値に戻す処理を入れますが、まずはモード解除だけでOK
-                if(meta?.renamingStatus.previousValue) {
-                  meta.updateRowName(fileItem.id, meta?.renamingStatus.previousValue)
+                if(meta?.renameStatus.previousValue) {
+                  meta.updateRowName(fileItem.id, meta?.renameStatus.previousValue)
                 }
-                meta.setRenamingStatus({
-                  isRenaming: false
-                });
+                meta.onRenameAbort(fileItem)
+                fileItem.fileName = meta.renameStatus.previousFileName
               }
             }}
             />
         ) : (
           fileItem.link ?
             <div className="ml-3 mr-3"
-              onClick={async () => {
+              onClick={async (evt) => {
+                evt.preventDefault()
                 meta?.validateToAllowRedirect(fileItem.id)
               }}>{fileItem.fileName}</div> :
             <span className="ml-3 mr-3 ">{fileItem.fileName}</span>
@@ -212,10 +209,12 @@ export const fileItemColumns: ColumnDef<FileItem>[] = [
           <DropdownMenuSeparator />
           <DropdownMenuItem
             onSelect={(evt) => {
+              evt.stopPropagation()
               const meta = table.options.meta as any
-              meta.setRenamingStatus({
-                isRenaming: true,
-                previousValue: fileItem.fileName
+              meta.onRenameStart({
+                fileItem: fileItem,
+                pathId: fileItem.id,
+                currentFileName: fileItem.fileName
               })
             }}>Rename</DropdownMenuItem>
           <DropdownMenuItem>View fileItem details</DropdownMenuItem>

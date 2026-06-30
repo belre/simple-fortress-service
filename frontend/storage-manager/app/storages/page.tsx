@@ -2,11 +2,9 @@
 import { FileWorkspacePanel } from "@/components/file-workspace-panel"
 import { redirect } from "next/navigation";
 
-import { ClientPart } from "@/components/debugger";
 import { StorageApiFactory } from "@/service/storage/api-factory.service";
 import { AllowedResourceType } from "@/models/storage";
 import { SessionProvider } from "@/components/session-provider";
-import { getOrCreateFileSession } from "../actions-session";
 
 interface PageProps {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
@@ -42,19 +40,16 @@ export default async function Page({ searchParams }: PageProps) {
     redirect(`/`)
   }
 
-  const session = await getOrCreateFileSession()
 
   console.log('[親] レンダリング発火')
   return (
     <div className="container mx-auto w-full h-screen">
       <SessionProvider
-        session={session}
         resourceType={resourceType}
         resourceName={resolvedParams.resource_name}
         workDirectoryPathId={resolvedParams.path_id ?? null}
         current={seedResolution}>
         <FileWorkspacePanel 
-          queryParameter={resolvedParams}
           resourceType={resourceType}
           resourceName={resolvedParams.resource_name}
           workDirectoryPathId={resolvedParams.path_id ?? null}

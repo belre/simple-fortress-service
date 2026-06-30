@@ -3,6 +3,8 @@ import { AllowedResourceType, CreatingStorageIndex, StorageDirectoryIndexed } fr
 export type CrudNotificationEventType =
   "success" | "warning" | "error"
 
+
+
 export interface UploadResult {
   fileId: string; // バックエンド未確定でも、IDが返る前提は崩れないはず
   url?: string;
@@ -18,24 +20,16 @@ export type UploadStatus =
   | "failed";
 
 
-export interface UploadError {
+export interface OperationError {
   message: string;
   code?: string;
   cause?: unknown;
 }
 
-export type UploadEventType =
-  | "progress"
-  | "completed"
-  | "failed"
-  | "status_changed"
-  | "started";
 
-export interface UploadProgressPayload {
-  type: "progress";
-  loaded: number;
-  total: number;
-  percent: number;
+export interface OperationFailedPayload {
+  type: "failed";
+  error: OperationError;
 }
 
 export interface UploadCompletedPayload {
@@ -43,9 +37,11 @@ export interface UploadCompletedPayload {
   result: UploadResult;
 }
 
-export interface UploadFailedPayload {
-  type: "failed";
-  error: UploadError;
+export interface UploadProgressPayload {
+  type: "progress";
+  loaded: number;
+  total: number;
+  percent: number;
 }
 
 export interface UploadStatusChangedPayload {
@@ -59,16 +55,6 @@ interface UploadStartedPayload {
   totalSize: number;
 }
 
-export type UploadEvent =
-  | UploadProgressPayload
-  | UploadCompletedPayload
-  | UploadFailedPayload
-  | UploadStatusChangedPayload
-  | UploadStartedPayload;
-
-export type UploadEventHandler<T extends UploadEventType = UploadEventType> = (
-  event: Extract<UploadEvent, { type: T }>
-) => void;
 
 export interface IndexCollectionCallbackPayload {
     type: IndexCollectionEventType
@@ -98,12 +84,88 @@ export interface IndexCollectionCrudResult {
   detail?: string
 }
 
-export interface IFileUploader {
-  upload(file: File): Promise<UploadResult>;
-  cancel(): void;
-  on<T extends UploadEventType>(event: T, handler: UploadEventHandler<T>): void;
-  off<T extends UploadEventType>(event: T, handler: UploadEventHandler<T>): void;
+/**
+ * IFileEventEmittable
+ * ファイルイベントを管理させるためのベースインターフェース
+ */
+
+export type AllAllowedFileEvent = UploadEvent
+
+export type AllAllowedFileEventType = FileOperationEventType | UploadEventType
+
+export type FileEventHandler<T extends AllAllowedFileEventType> = (
+  event: Extract<AllAllowedFileEvent, { type: T }>
+) => void;
+
+export interface IFileEventEmittable {
+  on<T extends AllAllowedFileEventType>(event: T, handler: FileEventHandler<T>): void;
+  off<T extends AllAllowedFileEventType>(event: T, handler: FileEventHandler<T>) : void;
 }
+
+/**
+ * IFileUploader
+ * アップロード機能を持つサービス層を表現したインターフェース
+ */
+
+export interface IFileUploader extends IFileEventEmittable {
+  upload(file: File): Promise<UploadResult>;
+  cancelUpload(): void;
+}
+
+interface FileMoveResultContent { 
+  moveTo?: string
+  isIgnore?: boolean
+  updatedId: string | null
+}
+
+export interface FileMoveResult {
+  result: "success" | "warning" | "error"
+  content: FileMoveResultContent | null
+  error?: OperationError
+}
+
+export interface FileCopyResult {
+  result: "success" | "error"
+  copyTo: string
+}
+
+export interface FileDeleteResult {
+  result: "success" | "error"
+  isNoContent: boolean
+  error?: OperationError
+}
+
+/**
+ * IFileOperation
+ * 基本的なファイル操作が可能なことを表すインターフェース
+ */
+
+export interface IFileOperation extends IFileEventEmittable {
+  move(pathId: string, newName: string) : Promise<FileMoveResult>
+  copy(pathId: string, newName: string) : Promise<FileCopyResult>
+  delete(pathId: string) : Promise<FileDeleteResult>
+}
+
+export type UploadEvent =
+  | OperationFailedPayload
+  | UploadProgressPayload
+  | UploadCompletedPayload
+  | UploadStatusChangedPayload
+  | UploadStartedPayload;
+
+export type FileOperationEventErrorType = 
+  "move_error" | "copy_error" | "delete_error"
+
+export type FileOperationEventType =
+  "moved" | "copied" | "deleted" | FileOperationEventErrorType
+
+export type UploadEventType =
+  | "progress"
+  | "completed"
+  | "failed"
+  | "status_changed"
+  | "started";
+
 
 export interface IIndexCollector {
   resolve(pathId: string, childLimit?: number) : Promise<IndexCollectionResolveResult>
@@ -112,6 +174,7 @@ export interface IIndexCollector {
 
 export interface IStorageApiFactory {
   createUploader(resourceType: AllowedResourceType) : IFileUploader;
+  createFileOperator(resourceType: AllowedResourceType) : IFileOperation
   createIndexCollector(resourceType: AllowedResourceType) : IIndexCollector
 }
 
