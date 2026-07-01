@@ -22,11 +22,13 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible"
 import { StorageDirectoryIndexed } from "@/models/storage";
-import { generateMockData } from "@/mock/path-resolver.mock";
+import { generateMockData, toPublicId } from "@/mock/path-resolver.mock";
 import React from "react";
 import { FileOperationMenu } from "./file-operation-menu";
 import { describeLargeIcon, StorageServiceIconObject } from "./storages/fileitem-columns";
 import { useRouter } from "next/navigation";
+import { useIndexing } from "@/hooks/use-file-access";
+import { StorageApiFactory } from "@/service/storage/api-factory.service";
 
 interface TmpStorageDirectoryIndexed extends StorageDirectoryIndexed {
   icon: StorageServiceIconObject | null
@@ -76,16 +78,49 @@ const StorageLink = ( props : StorageLinkProps) : React.ReactElement => {
     </div> )
 }
 
-/***
- * const [uploadingStatus, setUploadingStatus] = useAtom(uploadingStatusAtom)
-
-  console.log('[before push] uploadingStatus:', uploadingStatus)
-  console.log('[after push] uploadingStatus:', uploadingStatus)
-  
- * 
- */
+const storageApiFactory = StorageApiFactory.createStorageApiFactoryFromEnv("backend")
 
 export function AppSidebar() {
+  const {
+    fetchFilePath,
+  } = useIndexing(storageApiFactory, "s3-prefix")
+
+  const [ isRefreshState, setRefreshState] = React.useState(true)
+  const [ isPending, startTransition] = React.useTransition()
+
+  const [ currentDirs, setCurrentDirs] = React.useState<StorageDirectoryIndexed[]>([])
+
+  const onFetch = React.useEffectEvent(() => {
+    if(!isRefreshState) {
+      return
+    }
+
+    startTransition(async () => {
+      setRefreshState(false)
+      const result = await fetchFilePath(".root")
+
+      // 👇 ディレクトリ一覧を、アイコン付きで再構築して state にセットする
+      const dirs = result.data?.directory?.map(dir => {
+        return { 
+          ...dir, 
+          icon: describeLargeIcon(dir.resourceType),
+          directory: (dir.directory ?? []).map(child => {
+            return {
+              ...child,
+              icon: describeLargeIcon(child.resourceType),
+              directory: null
+            }
+          })
+        }
+      }) ?? []
+      setCurrentDirs(dirs)
+    })
+  })
+
+  React.useEffect(() => {
+      onFetch()
+  }, [isRefreshState]) 
+
   return (
     <Sidebar>
       <SidebarHeader />
@@ -102,7 +137,7 @@ export function AppSidebar() {
               <CollapsibleContent>
                 <SidebarGroupContent>
                   <SidebarMenu>
-                    {projects.map((project) => (
+                    {currentDirs.map((project) => (
                       <SidebarMenuItem key={project.pathId}>
                       <Collapsible defaultOpen className="group/collapsible/child w-full">
                         <div className="flex items-center justify-between w-full rounded-md hover:bg-sidebar-accent flex-nowrap" 

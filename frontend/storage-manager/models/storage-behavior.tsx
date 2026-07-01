@@ -68,7 +68,9 @@ export type IndexCollectionEventType =
 export interface IndexCollectionResolveResult {
   result: "success" | "error"
   data: StorageDirectoryIndexed | null
-  childCursor?: string
+  childCursor?: string | null
+  count?: number
+  error?: OperationError
 }
 
 export interface IndexCollectionListResult {
@@ -168,8 +170,7 @@ export type UploadEventType =
 
 
 export interface IIndexCollector {
-  resolve(pathId: string, childLimit?: number) : Promise<IndexCollectionResolveResult>
-  listIndexes( cursor: string,  limit?: number) : Promise<IndexCollectionListResult>
+  resolve(pathId: string | null, cursor: string | null, childLimit?: number) : Promise<IndexCollectionResolveResult>
 }
 
 export interface IStorageApiFactory {

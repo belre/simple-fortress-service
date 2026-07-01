@@ -1,7 +1,8 @@
 
+export type Caller = "frontend" | "backend"
+
 
 export type AllowedResourceType = 
-    "seed-indexer" |        // -- 他のresource_typeのunionとして構成される
     "s3-prefix" | "s3-folder" | "aws-favorites" | "aws-trashes"
 
 
@@ -12,11 +13,12 @@ export interface StorageDirectory {
 export interface StorageDirectoryIndexed extends StorageDirectory {
     pathId: string
     name: string
+    prefix: string | null
     resourceType?: AllowedResourceType
     resourceName?: string
     routingTarget?: string
     updatedAt?: string,
-    status: "syncing" | "completed"
+    status: "syncing" | "completed" | "active"
     directory: Array<StorageDirectoryIndexed> | null            // -- サブディレクトリの定義として使用する
 }
 

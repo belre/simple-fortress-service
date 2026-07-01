@@ -32,13 +32,13 @@ interface FileWorkspacePanelContentProps {
   deleteStatus: DeleteStatus
   onRenameStart: ( {pathId, currentFileName} : { pathId: string, currentFileName: string}) => void
   onRenameAbort: ( fileItem: FileItem ) => void
-  onRenameSubmit: ( {pathId, newName, fileItem} : {pathId: string, newName: string, fileItem: FileItem}) => Promise<FileMoveResult | null>
+  mutateRename: UseMutateFunction<FileMoveResult | null, Error, { pathId: string, newName: string }, unknown>
   mutateDelete: UseMutateFunction<FileDeleteResult | null, Error, string, unknown>,
 }
 
 
 
-const convertToFileItem = (resourceName?: string | null, dirs?: StorageDirectoryIndexed[]) : FileItem[] => {
+const convertToFileItem = (resourceName?: string | null, dirs?: StorageDirectoryIndexed[] | null) : FileItem[] => {
   if(!resourceName)
     return []
 
@@ -74,14 +74,13 @@ function InlineHeader({
   current: IndexCollectionResolveResult,
   resourceName: string
 }) {
-  const targetPathName = `s3://${resourceName}${current?.data?.name}`
-
+  const targetPathName = `s3://${resourceName}/${current?.data?.prefix ?? ''}${current?.data?.name}`
   return (<div className="h-[30px] flex items-center">
   {
     targetPathName ? 
       <h2 className="ml-3 items-center">{targetPathName}</h2> :
       <Skeleton className="ml-3 w-[200px] rounded-full h-4" />
-    }
+  }
   </div>)
 }
 
@@ -160,7 +159,7 @@ function FileWorkspacePanelContent({
   deleteStatus,
   onRenameStart,
   onRenameAbort,
-  onRenameSubmit,
+  mutateRename,
   mutateDelete
 } : FileWorkspacePanelContentProps) {
 
@@ -172,10 +171,10 @@ function FileWorkspacePanelContent({
     validateToAllowRedirect,
     accessError,
     releaseError
-  } = useIndexing(storageApiFactory, resourceName, resourceType)
+  } = useIndexing(storageApiFactory, resourceType)
 
   // 💡 テーブルのフォーカスや遅延制御の状態は、このパネルが王様として管理する
-  const [focusedId, setFocusedId] = React.useState<string | null>(null)
+  const [ focusedId, setFocusedId] = React.useState<string | null>(null)
 
   const [ addedTableData, setAddedTableData] = React.useState<FileItem[]>(
     convertToFileItem(resourceName, current?.data?.directory ?? [])
@@ -193,7 +192,7 @@ function FileWorkspacePanelContent({
           item.id === renameStatus.targetPathId 
             ? { ...item, 
               id: renameStatus.renamedId ?? item.id,
-              fileName: renameStatus.renamedValue ?? item.fileName
+              fileName: renameStatus.renamedValue!
             } : item
           )
       )
@@ -263,10 +262,14 @@ function FileWorkspacePanelContent({
         focusId={focusedId}
         onRowSelected={setFocusedId}
         onPaginationTriggered={async () => {
-          const result = await paginateFilePath(lastCursor)
-          const newAddedTableData = convertToFileItem(resourceName, result?.indexes) ?? []
+          const pathId = current?.data?.pathId
+          if(!pathId) {
+            return
+          }
+          const result = await paginateFilePath( pathId, lastCursor)
+          const newAddedTableData = convertToFileItem(resourceName, result?.data?.directory ?? null) ?? []
           setAddedTableData( [ ...addedTableData, ...newAddedTableData])
-          setLastCursor(result.nextCursor ?? null)
+          setLastCursor(result.childCursor ?? null)
         }}
         paginationCursor={lastCursor ?? null}
         meta={{
@@ -274,7 +277,7 @@ function FileWorkspacePanelContent({
           renameStatus: renameStatus,
           onRenameStart: onRenameStart,
           onRenameAbort: onRenameAbort,
-          onRenameSubmit: onRenameSubmit,
+          mutateRename: mutateRename,
           mutateDelete: mutateDelete,
           tableData: addedTableData,
           updateRowName: (rowId: string, newName: string) => {
@@ -283,7 +286,7 @@ function FileWorkspacePanelContent({
           },
           validateToAllowRedirect: (id: string)=>{
             startTransition(async () => {
-              await validateToAllowRedirect(id)
+              await validateToAllowRedirect(id, resourceName)
             })
           }
         }}
@@ -302,6 +305,7 @@ function FileWorkspacePanelContent({
 
 export function FileWorkspacePanel({ workDirectoryPathId, resourceName, resourceType, current }: FileWorkspacePanelProps) {
   const { 
+    mutateRename,
     mutateUpload, 
     mutateDelete,
     progress, 
@@ -309,7 +313,6 @@ export function FileWorkspacePanel({ workDirectoryPathId, resourceName, resource
     deleteStatus,
     onRenameStart,
     onRenameAbort,
-    onRenameSubmit
   } = useFileOperationEvent(storageApiFactory, resourceType)
 
   return (
@@ -334,7 +337,7 @@ export function FileWorkspacePanel({ workDirectoryPathId, resourceName, resource
           mutateDelete={mutateDelete}
           onRenameStart={onRenameStart}
           onRenameAbort={onRenameAbort}
-          onRenameSubmit={onRenameSubmit}
+          mutateRename={mutateRename}
           current={current}
         />    
       </DropdownBox>

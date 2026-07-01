@@ -131,7 +131,7 @@ export const fileItemColumns: ColumnDef<FileItem>[] = [
             onKeyDown={async (evt) => {
               if (evt.key === "Enter") {
                 evt.preventDefault();
-                await meta.onRenameSubmit({
+                await meta.mutateRename({
                   pathId: fileItem.id, 
                   newName: fileItem.fileName,
                   fileItem: fileItem

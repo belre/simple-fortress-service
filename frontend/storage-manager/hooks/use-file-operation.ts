@@ -63,12 +63,14 @@ export function useFileRename(
 	resourceType: AllowedResourceType | null
 ) {
 	const [ renameStatus, setRenameStatus] = React.useState<RenamingStatus>({
-		isRenaming: false
+		isRenaming: false,
+		wasRenameSucceed: false
 	})
 
     const onRenameStart = ( {pathId, currentFileName} : { pathId: string, currentFileName: string}) => {
         setRenameStatus({ 
 			isRenaming: true, 
+			wasRenameSucceed: false,
 			targetPathId: pathId,
 			previousValue: currentFileName
 		})
@@ -76,7 +78,10 @@ export function useFileRename(
 
 	const onRenameAbort = () => {
 		setRenameStatus({
+			...renameStatus,
 			isRenaming: false,
+			wasRenameSucceed: false,
+			targetPathId: renameStatus.targetPathId,
 			renamedValue: renameStatus.previousValue
 		})
 	}
@@ -86,44 +91,45 @@ export function useFileRename(
 		toast.error(msg)
 	}
 
-    const onRenameSubmit = async ( {newName} : {newName: string}) : Promise<FileMoveResult> => {
-		if(!resourceType) {
-	        setRenameStatus({ 
-				isRenaming: false 
-			})
-			return {
-				result: "error",
-				content: null,
-				error: {
-					message: "Resource Type is not allowed"
+	const mutate = useMutation({
+		mutationFn: async ({pathId, newName} : {pathId: string, newName: string}) => {
+			if(!resourceType) {
+				setRenameStatus({ 
+					wasRenameSucceed: false,
+					isRenaming: false 
+				})
+				return {
+					result: "error",
+					content: null,
+					error: {
+						message: "Resource Type is not allowed"
+					}
 				}
 			}
-		}
 
-		if(!renameStatus.targetPathId) {
-			return {
-				result: "error",
-				content: null,
-				error: {
-					message: "Not found path id"
+			if(!renameStatus.targetPathId) {
+				return {
+					result: "error",
+					content: null,
+					error: {
+						message: "Not found path id"
+					}
 				}
 			}
-		}
 
-		if(newName == renameStatus.previousValue) {
-			onRenameAbort()
-			return {
-				result: "warning",
-				content: {
-					isIgnore: true,
-					updatedId: null
+			if(newName == renameStatus.previousValue) {
+				onRenameAbort()
+				return {
+					result: "warning",
+					content: {
+						isIgnore: true,
+						updatedId: null
+					}
 				}
 			}
-		}
 
-		try {
 			const operation = storageApiFactory.createFileOperator(resourceType)
-	        const result = await operation.move( renameStatus.targetPathId, newName)
+			const result = await operation.move( renameStatus.targetPathId, newName)
 
 			if ( result.result != "success" ){
 				onSubmitError(result.error?.message ?? "unknown error")
@@ -132,6 +138,7 @@ export function useFileRename(
 
 			setRenameStatus({
 				isRenaming: false,
+				wasRenameSucceed: true,
 				targetPathId: renameStatus.targetPathId,
 				renamedValue: newName,
 				renamedId: result.content?.updatedId ?? null
@@ -139,20 +146,14 @@ export function useFileRename(
 
 			toast.success(`Rename Succeed: ${newName}`)
 			return result
-		} catch(e) {
+		},
+		onError: (e) => {
 			const error = e as Error
-			onSubmitError(error?.message)
-			return {
-				result: "error",
-				content: null,
-				error: {
-					message: error!.message
-				}
-			}
+			onSubmitError(error.message)
 		}
-    }
+	})
 
-	return { renameStatus, onRenameStart, onRenameAbort, onRenameSubmit}
+	return { ...mutate, renameStatus, onRenameStart, onRenameAbort}
 }
 
 export function useFileDelete(
@@ -165,36 +166,39 @@ export function useFileDelete(
 		deletedId: null
     })
 
-    const mutate = async (pathId: string) => {
-		if(!resourceType) {
-	        setDeleteStatus({ 
-				isDeleting: false,
+    const mutate = useMutation({
+		mutationFn : async (pathId: string) => {
+			if(!resourceType) {
+				throw new Error("Resource type is not allowed")
+			}
+
+			setDeleteStatus({ 
+				isDeleting: true,
 				deletedId: null
 			})
-			return {
-				result: "error",
-				content: null,
-				error: {
-					message: "Resource Type is not allowed"
-				}
-			}
-		}
 
-        setDeleteStatus({ 
-			isDeleting: true,
-			deletedId: null
-		 })
+			const operation = storageApiFactory.createFileOperator(resourceType)
+			const result = await operation.delete(pathId)
+			if (result.result === 'error') {
+            	throw new Error(result.error?.message) // ここで例外に変換
+        	}
+			setDeleteStatus({ 
+				isDeleting: false,
+				deletedId: pathId
+			})
+			toast.success(`Delete Succeed: ${pathId}`)
+			return result
+		},
+		onError: (e) => {
+			toast.error(e.message)
+			setDeleteStatus({ 
+				isDeleting: false,
+				deletedId: deleteStatus.deletedId
+			})
+		},
+	})
 
-		const operation = storageApiFactory.createFileOperator(resourceType)
-        const result = await operation.delete(pathId)
-        setDeleteStatus({ 
-			isDeleting: false,
-			deletedId: pathId
-		})
-        return result
-    }
-
-    return { deleteStatus, mutate }
+    return { ...mutate, deleteStatus }
 }
 
 
@@ -203,13 +207,13 @@ export function useFileOperationEvent(
 	storageApiFactory: IStorageApiFactory, 
 	resourceType: AllowedResourceType | null
 ) {
-    const { renameStatus, onRenameStart, onRenameAbort, onRenameSubmit } = useFileRename(storageApiFactory, resourceType)
+    const { mutate: mutateRename, renameStatus, onRenameStart, onRenameAbort } = useFileRename(storageApiFactory, resourceType)
     const { mutate: mutateUpload, progress, uploadStatusTracker } = useFileUpload(storageApiFactory, resourceType)
 	const { mutate: mutateDelete, deleteStatus } = useFileDelete(storageApiFactory, resourceType)
     return {
 		onRenameStart, 
 		onRenameAbort,
-		onRenameSubmit,
+		mutateRename,
 		mutateUpload,
 		mutateDelete,
 		progress,

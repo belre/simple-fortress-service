@@ -23,11 +23,11 @@ export default async function Page({ searchParams }: PageProps) {
     redirect(`/`)
   }
 
-  const apiFactory = StorageApiFactory.createStorageApiFactoryFromEnv()
-  const collector = apiFactory.createIndexCollector("seed-indexer")
+  const apiFactory = StorageApiFactory.createStorageApiFactoryFromEnv("backend")
+  const collector = apiFactory.createIndexCollector("s3-prefix")
 
   // 💡 depth: 2 を指定して、タイプと初期データを「1回のフェッチ」で同時に持ってくる！
-  const seedResolution = await collector.resolve(resolvedParams.path_id, 2)
+  const seedResolution = await collector.resolve(resolvedParams.path_id, null, 2)
   
   // もしデータが取れなければ即セーフティリダイレクト
   if (!seedResolution || seedResolution.result === "error") {

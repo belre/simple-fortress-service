@@ -1,43 +1,51 @@
 
-import { StorageDirectoryIndexed } from "@/models/storage";
+import { AllowedResourceType, StorageDirectoryIndexed } from "@/models/storage";
 
-import { generateMockData } from "@/mock/path-resolver.mock";
-import { IIndexCollector, IndexCollectionListResult, IndexCollectionResolveResult } from "@/models/storage-behavior";
+import { fromPublicId, generateMockData, serverMockData, toPublicId, traverse } from "@/mock/path-resolver.mock";
+import { IIndexCollector, IndexCollectionResolveResult } from "@/models/storage-behavior";
 
 
 export class SimplePathResolverService implements IIndexCollector {
+    constructor(private resourceType: AllowedResourceType) {
+    }
+    
     traverse(
         children: StorageDirectoryIndexed[], 
-        parent: StorageDirectoryIndexed,
         recursive=false) : StorageDirectoryIndexed[] {
 
         return children.map(child => {
-            //child.resourceName = parent.resourceName
-            //child.resourceType = parent.resourceType
-
             if(recursive) {
                 child.directory = child.directory?.
-                    map( c => this.traverse( [c], child)).
+                    map( c => this.traverse( [c])).
                     flat() ?? []
             }
-
             return child
         })
     }
 
-    async resolve(pathId: string, childLimit?: number) : Promise<IndexCollectionResolveResult> {
-        const mock = generateMockData()
+    async resolve(pathId: string | null, cursor: string | null, childLimit?: number) : Promise<IndexCollectionResolveResult> {
+        if(!pathId) {
+            return {
+                result: "error",
+                data: null
+            }
+        }
+        const baseData = generateMockData()
+
+        /** mapによって、pathIdは自分自身以外に１個下の階層もエンコード対象とする */
+        const mock = traverse(baseData, true, (metadata) => { 
+            return {
+                ...metadata, 
+                pathId: toPublicId(metadata.pathId),
+                directory: metadata.directory?.map(c => ({...c, pathId: toPublicId(c.pathId)})) ?? null
+            }
+        })
 
         const targets = mock
-            .map(metadata => [...
-                this.traverse(
-                    metadata.directory ?? [], metadata), 
-                    metadata
-                ])
             .flat()
             .filter(metadata => metadata?.pathId === pathId)
 
-        if(targets.length != 1) {
+        if(targets.length === 0) {
             return {
                 result : "error",
                 data: null
@@ -45,11 +53,26 @@ export class SimplePathResolverService implements IIndexCollector {
         }
         
         const target = targets[0]
-        let cursor = undefined
-        if(target.directory) {
+        if(!cursor && target.directory) {
             const actualLimit = childLimit ?? 10
             target.directory = target.directory?.
                 filter((c, index) => index < actualLimit)
+            
+            if(target.directory?.length >= actualLimit) {
+                cursor = target.directory[target.directory.length-1].pathId
+            }
+        } else {
+            const findIndex = target.directory?.findIndex(c => c.pathId === cursor) ?? -1
+            if(findIndex < 0) {
+                return {
+                    result: "error",
+                    data: null
+                }
+            }
+
+            const actualLimit = childLimit ?? 10
+            target.directory = target.directory?.
+                filter((c, index) => index > findIndex && index <= findIndex + actualLimit) ?? []
             
             if(target.directory?.length >= actualLimit) {
                 cursor = target.directory[target.directory.length-1].pathId
@@ -62,66 +85,88 @@ export class SimplePathResolverService implements IIndexCollector {
             childCursor: cursor
         }
     }
+}
 
-    async listIndexes(cursor: string, limit?: number) : Promise<IndexCollectionListResult> {
-        const mock = generateMockData()
-        const limitSize = limit ?? 10;
+export class SimpleBackendPathResolverService implements IIndexCollector {
+    constructor(private resourceType: AllowedResourceType) {
+    }
 
-        // 1. ツリーの全ノードを平坦化
-        const allFlattenNodes = mock
-            .map(metadata => [...this.traverse(metadata.directory ?? [], metadata), metadata])
-            .flat();
 
-        let targetList: StorageDirectoryIndexed[] = [];
-        let targetIndex = 0;
-        let isRoot = false;
+    async resolve(pathId: string | null, cursor: string | null, childLimit?: number) : Promise<IndexCollectionResolveResult> {
+        const baseData = generateMockData()
 
-        // 2. ターゲットとなる階層（配列）と、cursorのインデックスを特定
-        if (cursor === "root" || cursor === "") {
-            targetList = mock;
-            targetIndex = 0;
-            isRoot = true; // ルートの場合は先頭から取りたいのでフラグで制御
-        } else {
-            const parentNode = allFlattenNodes.find(node => 
-                (node.directory ?? []).some(child => child.pathId === cursor)
-            );
-
-            if (parentNode && parentNode.directory) {
-                targetList = parentNode.directory;
-                targetIndex = targetList.findIndex(child => child.pathId === cursor);
-            } else {
-                const isRootChild = mock.some(child => child.pathId === cursor);
-                if (isRootChild) {
-                    targetList = mock;
-                    targetIndex = mock.findIndex(child => child.pathId === cursor);
-                } else {
-                    targetList = [];
-                    targetIndex = -1;
+        if( pathId === ".root") {
+            /** mapによって、pathIdは自分自身以外に１個下の階層もエンコード対象とする */
+            return {
+                result: "success",
+                data: {
+                    pathId: ".root",
+                    name: "Root",
+                    resourceType: this.resourceType,
+                    status: "active",
+                    directory: traverse(baseData, false, (metadata) => { 
+                        return {
+                            ...metadata, 
+                            pathId: toPublicId(metadata.pathId),
+                            directory: metadata.directory?.map(c => ({...c, pathId: toPublicId(c.pathId)})) ?? null
+                        }
+                    })
                 }
             }
         }
+        
+        const mock = traverse(baseData, true, (metadata) => { 
+            return {
+                ...metadata, 
+                pathId: toPublicId(metadata.pathId)
+            }
+        })
 
-        // 💡 3. 【修正の核心】cursorが指定されているなら、その「次の要素」を開始位置にする
-        // targetIndex が見つからなかった場合（-1）や、ルート（先頭）からの場合は 0 からスタート。
-        let startIndex = 0;
-        if (!isRoot && targetIndex !== -1) {
-            startIndex = targetIndex + 1; // 👈 完璧に「次のデータ」を指す！
+        const targets = mock
+            .flat()
+            .filter(metadata => metadata?.pathId === pathId )
+
+        if(targets.length == 0) {
+            return {
+                result : "error",
+                data: null
+            }
+        }
+        
+        const target = targets[0]
+        if(!cursor && target.directory) {
+            const actualLimit = childLimit ?? 10
+            target.directory = target.directory?.
+                filter((c, index) => index < actualLimit).
+                map(metadata => ({...metadata, pathId: toPublicId(metadata.pathId)}))
+            
+            if(target.directory?.length >= actualLimit) {
+                cursor = target.directory[target.directory.length-1].pathId
+            }
+        } else {
+            const findIndex = target.directory?.findIndex(c => c.pathId === cursor) ?? -1
+            if(findIndex < 0) {
+                return {
+                    result: "error",
+                    data: null
+                }
+            }
+
+            const actualLimit = childLimit ?? 10
+            target.directory = (target.directory?.
+                filter((c, index) => index > findIndex && index <= findIndex + actualLimit) ?? []).
+                map(metadata => ({...metadata, pathId: toPublicId(metadata.pathId)}))
+            
+            if(target.directory?.length >= actualLimit) {
+                cursor = target.directory[target.directory.length-1].pathId
+            }
         }
 
-        // 4. 正しい位置から指定分だけ切り出す
-        const slicedNodes = targetList.slice(startIndex, startIndex + limitSize);
-
-        // 次のページがまだ後ろに控えているか
-        const hasNext = startIndex + slicedNodes.length < targetList.length;
-        
-        // これ以上次がなければ undefined
-        const nextCursor = hasNext ? slicedNodes.at(-1)?.pathId : undefined;
-
         return {
-            indexes: slicedNodes,
-            nextCursor: nextCursor,
-            count: targetList.length
-        };
+            result: "success",
+            data: target,
+            childCursor: cursor
+        }
     }
 
 }

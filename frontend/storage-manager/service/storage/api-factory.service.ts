@@ -1,11 +1,14 @@
-import { AllowedResourceType } from "@/models/storage"
+import { AllowedResourceType, Caller } from "@/models/storage"
 import { IFileOperation, IFileUploader, IIndexCollector, IStorageApiFactory } from "@/models/storage-behavior"
 import { SimpleUploader } from "./simple-uploader.service"
-import { SimplePathResolverService } from "./simple-path-resolver.service"
+import { SimpleBackendPathResolverService, SimplePathResolverService } from "./simple-path-resolver.service"
 import { FactoryUseCase } from "./api-factory.dto"
 
 
 class MockStorageApiFactory implements IStorageApiFactory {
+  constructor(private caller: Caller = "frontend") {
+  }
+
   createUploader(resourceType: AllowedResourceType) : IFileUploader {
     switch(resourceType) {
       case "s3-prefix":
@@ -27,20 +30,26 @@ class MockStorageApiFactory implements IStorageApiFactory {
   }
 
   createIndexCollector(resourceType: AllowedResourceType): IIndexCollector {
-    if(resourceType != "seed-indexer") {
-      return this._selectIndexCollector(resourceType)
-    } 
-
-    // 本来はここに"seed-indexerのキャッシュやテーブルから、
-    // 実際のresource_typeを取り出すコードが追加される。
-    return this._selectIndexCollector("s3-prefix")
+    return this.caller === "backend" ? 
+      this._selectBackendIndexCollector(resourceType) : 
+      this._selectIndexCollector(resourceType)
   }
 
   _selectIndexCollector(resourceType: Exclude<AllowedResourceType, "seed-indexer">): IIndexCollector {
     switch(resourceType) {
       case "s3-prefix":
       case "s3-folder":
-        return new SimplePathResolverService()
+        return new SimplePathResolverService(resourceType)
+      default:
+        throw new Error("not implemented")
+    }
+  }
+
+  _selectBackendIndexCollector(resourceType: Exclude<AllowedResourceType, "seed-indexer">): IIndexCollector {
+    switch(resourceType) {
+      case "s3-prefix":
+      case "s3-folder":
+        return new SimpleBackendPathResolverService(resourceType)
       default:
         throw new Error("not implemented")
     }
@@ -48,18 +57,18 @@ class MockStorageApiFactory implements IStorageApiFactory {
 }
 
 export class StorageApiFactory {
-  static createStorageApiFactory(useCase: FactoryUseCase) {
+  static createStorageApiFactory(useCase: FactoryUseCase, caller: Caller = "frontend") : IStorageApiFactory {
     switch(useCase) {
       case "Mock":
-        return new MockStorageApiFactory()
+        return new MockStorageApiFactory(caller)
       default:
         throw new Error("not implemented")
     }
   }
   
-  static createStorageApiFactoryFromEnv() {
+  static createStorageApiFactoryFromEnv(caller: Caller = "frontend") : IStorageApiFactory {
     const fromEnv = process.env.storageApiFactoryType as FactoryUseCase
-    return StorageApiFactory.createStorageApiFactory(fromEnv || "Mock")
+    return StorageApiFactory.createStorageApiFactory(fromEnv || "Mock", caller)
   }
 }
 
