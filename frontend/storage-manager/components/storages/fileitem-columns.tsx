@@ -126,6 +126,9 @@ export const fileItemColumns: ColumnDef<FileItem>[] = [
               meta.updateRowName(fileItem.id, evt.target.value)
             }}
             onBlur={() => {
+              if(!isCurrentRowRenaming) {
+                return
+              }
               meta.onRenameAbort(fileItem)
             }}
             onKeyDown={async (evt) => {

@@ -39,6 +39,8 @@ class MockStorageApiFactory implements IStorageApiFactory {
     switch(resourceType) {
       case "s3-prefix":
       case "s3-folder":
+      case "aws-favorites":
+      case "aws-trashes":
         return new SimplePathResolverService(resourceType)
       default:
         throw new Error("not implemented")
@@ -49,6 +51,8 @@ class MockStorageApiFactory implements IStorageApiFactory {
     switch(resourceType) {
       case "s3-prefix":
       case "s3-folder":
+      case "aws-favorites":
+      case "aws-trashes":
         return new SimpleBackendPathResolverService(resourceType)
       default:
         throw new Error("not implemented")

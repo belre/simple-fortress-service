@@ -9,7 +9,6 @@ import * as React from 'react'
 
 interface FileWorkspacePanelProps {
     children: React.ReactNode
-    session: string | null
     current: IndexCollectionResolveResult
     workDirectoryPathId: string | null
     resourceName: string
@@ -23,13 +22,15 @@ export function SessionProvider(props : FileWorkspacePanelProps) {
 
     const [isPending, startTransition] = React.useTransition()
 
-    const [sessionData, setSessionData] = React.useState<string | null>(props.session)
+    const [sessionData, setSessionData] = React.useState<string | null>(null)
     
     React.useEffect(() => {
+        if(sessionData){
+            return
+        }
         startTransition(async () => {
             const session = await getOrCreateFileSession()
             setSessionData(session)
-            console.log(session)
         })
     }, [sessionData])
 

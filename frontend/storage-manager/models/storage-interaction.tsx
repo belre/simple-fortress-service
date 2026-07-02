@@ -22,6 +22,8 @@ export interface RenamingStatus {
 
 export interface DeleteStatus {
     isDeleting: boolean
+    wasDeleteSucceed: boolean
+    targetPathId?: string | null
     deletedId: string | null
 }
 

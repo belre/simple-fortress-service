@@ -76,7 +76,7 @@ export const generateMockData = () => {
     directory: []
   },   
   { 
-    name: "すべてのお気に入り", 
+    name: "Favorites", 
     resourceType: "aws-favorites",
     resourceName: "favorites",
     routingTarget: "/favorites",
@@ -86,7 +86,7 @@ export const generateMockData = () => {
     directory: []
   },
   { 
-    name: "ゴミ箱", 
+    name: "Trashes", 
     resourceType: "aws-trashes",
     resourceName: "trashes",
     routingTarget: "/trashes",

@@ -14,7 +14,8 @@ import { FileDeleteResult, FileMoveResult, IndexCollectionResolveResult, UploadR
 import { useIndexing } from "@/hooks/use-file-access";
 import { StorageApiFactory } from "@/service/storage/api-factory.service";
 import { UseMutateFunction } from "@tanstack/react-query";
-import { DeleteStatus, RenamingStatus } from "@/models/storage-interaction";
+import { DeleteStatus, ManagedUploadStatus, RenamingStatus } from "@/models/storage-interaction";
+import { toast } from "sonner";
 
 
 interface FileWorkspacePanelProps {
@@ -69,12 +70,18 @@ const storageApiFactory = StorageApiFactory.createStorageApiFactoryFromEnv()
 
 function InlineHeader({
   current, 
+  resourceType,
   resourceName
 }: {
   current: IndexCollectionResolveResult,
+  resourceType: AllowedResourceType,
   resourceName: string
 }) {
-  const targetPathName = `s3://${resourceName}/${current?.data?.prefix ?? ''}${current?.data?.name}`
+  let targetPathName = current?.data?.name ?? ''
+  if(resourceType === "s3-folder" || resourceType === "s3-prefix") {
+    targetPathName = `s3://${resourceName}/${current?.data?.prefix ?? ''}${current?.data?.name}`
+  }
+  
   return (<div className="h-[30px] flex items-center">
   {
     targetPathName ? 
@@ -190,7 +197,8 @@ function FileWorkspacePanelContent({
       setAddedTableData(prev => 
         prev.map(item => 
           item.id === renameStatus.targetPathId 
-            ? { ...item, 
+            ? { 
+              ...item, 
               id: renameStatus.renamedId ?? item.id,
               fileName: renameStatus.renamedValue ? renameStatus.renamedValue : item.fileName,
               status: renameStatus.isSyncing ? 'syncing' : 'completed'
@@ -202,18 +210,23 @@ function FileWorkspacePanelContent({
  
   React.useEffect(() => {
     startTransition(() => {
-      if(!deleteStatus.deletedId) {
+      if(!deleteStatus.targetPathId) {
         return
       }
+
       setAddedTableData(prev => 
-          prev.map(item => 
-              item.id === deleteStatus.deletedId 
-                  ? { ...item, status: 'deleted' } 
-                  : item
+        prev.map(item => 
+          item.id === deleteStatus.targetPathId 
+            ? { 
+              ...item, 
+              status: deleteStatus.wasDeleteSucceed ? 'deleted' : (
+                deleteStatus.isDeleting ? 'syncing' : 'completed'
+              ) 
+            } : item
           )
       )
     })
-  }, [deleteStatus.deletedId])
+  }, [deleteStatus])
 
   return (
     // ただのdivではなく、役割を持った「ワークスペースの背景」として定義
@@ -241,6 +254,10 @@ function FileWorkspacePanelContent({
           return
         }
         const target = targets[0]
+        if(target.status !== 'completed') {
+          toast.warning("Invalid Operation")
+          return
+        }
 
         if(evt.key == "F2") {
           if(focusedId) {
@@ -325,6 +342,7 @@ export function FileWorkspacePanel({ workDirectoryPathId, resourceName, resource
     <div className="container">
       <InlineHeader 
         current={current}
+        resourceType={resourceType}
         resourceName={resourceName}
       />
       <UploadProgressContent

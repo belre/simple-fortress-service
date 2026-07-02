@@ -8,10 +8,16 @@ import { toast } from "sonner";
 import { FileItem } from "@/components/storages/fileitem-columns";
 
 
+function sleep(ms: number) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+
 export function useFileUpload( 
 	storageApiFactory: IStorageApiFactory, 
 	resourceType: AllowedResourceType | null
 ){
+	const [ uploadDirectory, setUploadDirectory] = React.useState<strin | null>(null)
 	const [ progress, setProgress] = React.useState<number>(0)
 	const [ uploadStatusTracker, setUploadStatusTracker] = React.useState<ManagedUploadStatus>({
     	status: "idle",
@@ -23,6 +29,8 @@ export function useFileUpload(
 			if(!resourceType) {
 				return null
 			}
+
+			setUploadDirectory(file.name)
 
 			const uploader = storageApiFactory.createUploader(resourceType)
 
@@ -52,8 +60,11 @@ export function useFileUpload(
 	})
 
     React.useEffect(() => {
-        if (uploadStatusTracker.status === 'completed') toast.success('アップロードが完了しました')
-    }, [uploadStatusTracker.status])
+		if (uploadStatusTracker.status === 'uploading')
+			toast.info(`アップロードを開始しました: ${uploadDirectory}`)
+        if (uploadStatusTracker.status === 'completed')
+			toast.success(`アップロードが完了しました: ${uploadDirectory}`)
+    }, [uploadStatusTracker.status, uploadDirectory])
 
 	return {...mutation, progress, uploadStatusTracker}
 }
@@ -69,13 +80,17 @@ export function useFileRename(
 	})
 
     const onRenameStart = ( {pathId, currentFileName} : { pathId: string, currentFileName: string}) => {
-        setRenameStatus({ 
-			isRenamingField: true, 
-			isSyncing: false,
-			wasRenameSucceed: false,
-			targetPathId: pathId,
-			previousValue: currentFileName
-		})
+		// 少しだけ遅延させる
+		// Blurなどのチャタリング制御のため
+		setTimeout(() => {
+			setRenameStatus({ 
+				isRenamingField: true, 
+				isSyncing: false,
+				wasRenameSucceed: false,
+				targetPathId: pathId,
+				previousValue: currentFileName
+			})
+		}, 500)
     }
 
 	const onRenameAbort = () => {
@@ -174,6 +189,7 @@ export function useFileDelete(
 {
 	const [deleteStatus, setDeleteStatus] = React.useState<DeleteStatus>({
         isDeleting: false,
+		wasDeleteSucceed: false,
 		deletedId: null
     })
 
@@ -185,6 +201,8 @@ export function useFileDelete(
 
 			setDeleteStatus({ 
 				isDeleting: true,
+				wasDeleteSucceed: false,
+				targetPathId: pathId,
 				deletedId: null
 			})
 
@@ -195,6 +213,8 @@ export function useFileDelete(
         	}
 			setDeleteStatus({ 
 				isDeleting: false,
+				wasDeleteSucceed: true,
+				targetPathId: pathId,
 				deletedId: pathId
 			})
 			toast.success(`Delete Succeed: ${pathId}`)
@@ -204,7 +224,9 @@ export function useFileDelete(
 			toast.error(e.message)
 			setDeleteStatus({ 
 				isDeleting: false,
-				deletedId: deleteStatus.deletedId
+				wasDeleteSucceed: false,
+				targetPathId: deleteStatus.targetPathId,
+				deletedId: null
 			})
 		},
 	})

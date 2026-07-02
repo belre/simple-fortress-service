@@ -88,7 +88,7 @@ export function AppSidebar() {
   const [ isRefreshState, setRefreshState] = React.useState(true)
   const [ isPending, startTransition] = React.useTransition()
 
-  const [ currentDirs, setCurrentDirs] = React.useState<StorageDirectoryIndexed[]>([])
+  const [ currentDirs, setCurrentDirs] = React.useState<Record<string, StorageDirectoryIndexed[]>>([])
 
   const onFetch = React.useEffectEvent(() => {
     if(!isRefreshState) {
@@ -113,7 +113,7 @@ export function AppSidebar() {
           })
         }
       }) ?? []
-      setCurrentDirs(dirs)
+      setCurrentDirs({"AWS" : dirs})
     })
   })
 
@@ -126,7 +126,7 @@ export function AppSidebar() {
       <SidebarHeader />
         <SidebarContent>
           <Collapsible defaultOpen className="group/collapsible">
-            {Object.entries(storageAlignments).map(([alignment, projects]) => (
+            {Object.entries(currentDirs).map(([alignment, projects]) => (
             <SidebarGroup key={alignment} className="group/collapsible/parent">
               <SidebarGroupLabel asChild>
                 <CollapsibleTrigger>
@@ -137,7 +137,7 @@ export function AppSidebar() {
               <CollapsibleContent>
                 <SidebarGroupContent>
                   <SidebarMenu>
-                    {currentDirs.map((project) => (
+                    {projects.map((project) => (
                       <SidebarMenuItem key={project.pathId}>
                       <Collapsible defaultOpen className="group/collapsible/child w-full">
                         <div className="flex items-center justify-between w-full rounded-md hover:bg-sidebar-accent flex-nowrap" 

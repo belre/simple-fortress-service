@@ -41,6 +41,7 @@ export default async function Page({ searchParams }: PageProps) {
   }
 
 
+  console.log('[親] レンダリング発火')
   return (
     <div className="container mx-auto w-full h-screen">
       <SessionProvider
