@@ -11,7 +11,8 @@ export interface ManagedUploadStatus{
 }
 
 export interface RenamingStatus {
-    isRenaming: boolean
+    isRenamingField: boolean
+    isSyncing: boolean
     wasRenameSucceed: boolean
     targetPathId?: string
     previousValue?: string

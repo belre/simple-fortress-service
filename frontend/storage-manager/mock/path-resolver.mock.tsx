@@ -4,7 +4,7 @@ export const generateMockData = () => {
   const now = (new Date()).getTime()
 
   const awsStorageMockMetadata : Array<StorageDirectoryIndexed> = [{
-    name: "/",
+    name: ".",
     resourceType: "s3-prefix",
     resourceName: "my-bucket",
     prefix: null,
@@ -66,7 +66,7 @@ export const generateMockData = () => {
       status: "syncing",
     }],
   }, {
-    name: "/",
+    name: ".",
     resourceType: "s3-prefix",
     resourceName: "guest-bucket",
     prefix: null,

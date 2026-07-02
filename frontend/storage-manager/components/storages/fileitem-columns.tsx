@@ -103,7 +103,7 @@ export const fileItemColumns: ColumnDef<FileItem>[] = [
 
     // 💡 王様が meta に仕込んでくれた状態と関数をここで召喚する！
     const meta = table.options.meta as any
-    const isCurrentRowRenaming = meta?.renameStatus.isRenaming && meta?.focusedId === fileItem.id
+    const isCurrentRowRenaming = meta?.renameStatus.isRenamingField && meta?.focusedId === fileItem.id
     
     const displayIcon = fileItem.icon ?? File02Icon
 
@@ -190,7 +190,13 @@ export const fileItemColumns: ColumnDef<FileItem>[] = [
   id: "actions",
   cell: ({ row, table }) => {
     const fileItem = row.original
- 
+    const meta = table.options.meta as any
+    const resourceType = meta.resourceType as AllowedResourceType
+
+    if( resourceType != 's3-folder') {
+      return (<span/>)
+    }
+
     return (
       <DropdownMenu modal={false}>
         <DropdownMenuTrigger asChild>
@@ -200,24 +206,21 @@ export const fileItemColumns: ColumnDef<FileItem>[] = [
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <DropdownMenuLabel>Actions</DropdownMenuLabel>
-          <DropdownMenuItem
-            onClick={() => navigator.clipboard.writeText(fileItem.id)}
-          >
-            Copy fileItem ID
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
           <DropdownMenuItem
             onSelect={(evt) => {
               evt.stopPropagation()
-              const meta = table.options.meta as any
               meta.onRenameStart({
                 fileItem: fileItem,
                 pathId: fileItem.id,
                 currentFileName: fileItem.fileName
               })
             }}>Rename</DropdownMenuItem>
-          <DropdownMenuItem>View fileItem details</DropdownMenuItem>
+            <DropdownMenuItem
+              onSelect={async (evt) => {
+                evt.stopPropagation()
+                const meta = table.options.meta as any
+                await meta.mutateDelete(fileItem.id)
+              }}>Delete</DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
     )

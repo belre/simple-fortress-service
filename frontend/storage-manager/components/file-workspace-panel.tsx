@@ -183,7 +183,7 @@ function FileWorkspacePanelContent({
 
   React.useEffect(() => {
     startTransition(() => {
-      if(!renameStatus.targetPathId || !renameStatus.renamedValue) {
+      if(!renameStatus.targetPathId) {
         return
       }
 
@@ -192,7 +192,8 @@ function FileWorkspacePanelContent({
           item.id === renameStatus.targetPathId 
             ? { ...item, 
               id: renameStatus.renamedId ?? item.id,
-              fileName: renameStatus.renamedValue!
+              fileName: renameStatus.renamedValue ? renameStatus.renamedValue : item.fileName,
+              status: renameStatus.isSyncing ? 'syncing' : 'completed'
             } : item
           )
       )
@@ -220,6 +221,10 @@ function FileWorkspacePanelContent({
       className="outline-none w-full min-h-screen"
       tabIndex={0}
       onKeyDown={(evt) => {
+        if( resourceType !== 's3-folder') {
+          return
+        }
+        
         if (document.activeElement?.tagName === "INPUT") {
           return;
         }
@@ -274,6 +279,7 @@ function FileWorkspacePanelContent({
         paginationCursor={lastCursor ?? null}
         meta={{
           focusedId,
+          resourceType: resourceType,
           renameStatus: renameStatus,
           onRenameStart: onRenameStart,
           onRenameAbort: onRenameAbort,
@@ -334,10 +340,10 @@ export function FileWorkspacePanel({ workDirectoryPathId, resourceName, resource
           resourceType={resourceType}
           renameStatus={renameStatus}
           deleteStatus={deleteStatus}
+          mutateRename={mutateRename}
           mutateDelete={mutateDelete}
           onRenameStart={onRenameStart}
           onRenameAbort={onRenameAbort}
-          mutateRename={mutateRename}
           current={current}
         />    
       </DropdownBox>

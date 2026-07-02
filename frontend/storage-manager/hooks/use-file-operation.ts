@@ -63,13 +63,15 @@ export function useFileRename(
 	resourceType: AllowedResourceType | null
 ) {
 	const [ renameStatus, setRenameStatus] = React.useState<RenamingStatus>({
-		isRenaming: false,
+		isRenamingField: false,
+		isSyncing: false,
 		wasRenameSucceed: false
 	})
 
     const onRenameStart = ( {pathId, currentFileName} : { pathId: string, currentFileName: string}) => {
         setRenameStatus({ 
-			isRenaming: true, 
+			isRenamingField: true, 
+			isSyncing: false,
 			wasRenameSucceed: false,
 			targetPathId: pathId,
 			previousValue: currentFileName
@@ -78,8 +80,8 @@ export function useFileRename(
 
 	const onRenameAbort = () => {
 		setRenameStatus({
-			...renameStatus,
-			isRenaming: false,
+			isRenamingField: false,
+			isSyncing: false,
 			wasRenameSucceed: false,
 			targetPathId: renameStatus.targetPathId,
 			renamedValue: renameStatus.previousValue
@@ -92,11 +94,12 @@ export function useFileRename(
 	}
 
 	const mutate = useMutation({
-		mutationFn: async ({pathId, newName} : {pathId: string, newName: string}) => {
+		mutationFn: async ({pathId, newName} : {pathId: string, newName: string}) : Promise<FileMoveResult> => {
 			if(!resourceType) {
 				setRenameStatus({ 
 					wasRenameSucceed: false,
-					isRenaming: false 
+					isSyncing: false,
+					isRenamingField: false
 				})
 				return {
 					result: "error",
@@ -128,16 +131,24 @@ export function useFileRename(
 				}
 			}
 
+			setRenameStatus({
+				isRenamingField: false,
+				isSyncing: true,
+				wasRenameSucceed: false,
+				targetPathId: renameStatus.targetPathId,
+			})
+
 			const operation = storageApiFactory.createFileOperator(resourceType)
 			const result = await operation.move( renameStatus.targetPathId, newName)
 
-			if ( result.result != "success" ){
+			if ( result.result != "success" ) {
 				onSubmitError(result.error?.message ?? "unknown error")
 				return result
 			}
 
 			setRenameStatus({
-				isRenaming: false,
+				isRenamingField: false,
+				isSyncing: false,
 				wasRenameSucceed: true,
 				targetPathId: renameStatus.targetPathId,
 				renamedValue: newName,

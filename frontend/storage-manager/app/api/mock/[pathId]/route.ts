@@ -15,6 +15,10 @@ function deleteResponse(result: FileDeleteResult) : NextResponse {
     return NextResponse.json(result)
 }
 
+// Define a sleep function
+function sleep(ms: number) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
 
 
 export async function GET(
@@ -149,6 +153,8 @@ export async function PUT(
         })
     }
 
+    await sleep(2000)
+
     // update処理
     const newId = toPublicId(newName)       // 確定したものとする
     target.name = newName
@@ -198,6 +204,7 @@ export async function DELETE(
 
     // delete処理
     // ...
+    await sleep(2000)
     
     return deleteResponse({
         result: 'success',

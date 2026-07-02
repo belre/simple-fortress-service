@@ -3,13 +3,10 @@ import { AllowedResourceType } from "@/models/storage";
 import { 
   IFileUploader, 
   UploadEvent, 
-  UploadEventType, 
   UploadResult,
   IFileOperation,
-  FileOperationEventType,
   AllAllowedFileEventType,
   FileEventHandler,
-  IFileEventEmittable,
   FileMoveResult,
   FileCopyResult,
   FileDeleteResult,
@@ -67,7 +64,7 @@ export class SimpleUploader implements IFileUploader, IFileOperation {
     const decoder = new TextDecoder()
     
     const controller = new AbortController()
-    const fetched = await fetch('api/files/upload', {
+    const fetched = await fetch('api/mock/upload', {
       method: 'POST',
       body: formData
     })
@@ -108,7 +105,7 @@ export class SimpleUploader implements IFileUploader, IFileOperation {
   
   async move(pathId: string, newName: string) : Promise<FileMoveResult> {
     try{
-      const fetched = await fetch(`api/files/${pathId}`, {
+      const fetched = await fetch(`api/mock/${pathId}`, {
         method: 'PUT',
         body: JSON.stringify({
           resourceType: this._resourceType,
@@ -144,7 +141,7 @@ export class SimpleUploader implements IFileUploader, IFileOperation {
   }
   async delete(pathId: string) : Promise<FileDeleteResult> {
     try{
-      const fetched = await fetch(`api/files/${pathId}`, {
+      const fetched = await fetch(`api/mock/${pathId}`, {
         method: 'DELETE',
         body: JSON.stringify({
           resourceType: this._resourceType
